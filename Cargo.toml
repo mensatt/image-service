@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.6.20", features= ["multipart"] }
 env_logger = "0.10.0"
+libvips = "1.5.1"
 log = "0.4.20"
 tokio = { version = "1.33.0", features = ["full"] }
 uuid = { version = "1.4.1", features = ["v4"] }

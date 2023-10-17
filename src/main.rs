@@ -7,11 +7,15 @@ use axum::{
     Router,
 };
 use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path};
+use libvips::{ops, VipsApp, VipsImage};
 use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
+    libvips.concurrency_set(2);
 
     // Create Router with index and upload endpoints
     let app = Router::new()
@@ -109,5 +113,22 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
     }
 
     log::info!("Saved '{}'", new_name);
+
+    // test image conversion
+    let image = VipsImage::new_from_buffer(&data, &*"").unwrap();
+
+    let webp_name = "uploads/".to_owned() + &uuid.to_string() + ".webp";
+
+    let rotated = ops::rotate(&image, 90.0).unwrap();
+    match ops::webpsave(&rotated, &webp_name) {
+        Ok(_) => log::info!("Saved '{}'", webp_name),
+        Err(error) => {
+            log::error!("Error while writing '{}': {}", webp_name, error);
+            // todo: return an error
+        }
+    }
+
+    // end test image conversion
+
     return Ok(());
 }
