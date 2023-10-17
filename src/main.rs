@@ -1,14 +1,9 @@
-use axum::{
-    body::Bytes,
-    extract::Multipart,
-    http::StatusCode,
-    response::Html,
-    routing::{get, post},
-    Router,
-};
-use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path};
+use axum::{body::Bytes, extract::Multipart, http::StatusCode, response::Html, routing::{get, post}, Router, extract};
+use std::{env, ffi::OsStr, fs, io, net::SocketAddr};
+use extract::{Path, Query}; // <- this import breaks stuff as Path is also in axum
 use libvips::{ops, VipsApp, VipsImage};
 use uuid::Uuid;
+use serde::Deserialize;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +16,8 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handler))
         // TODO: Endpoint for image queries
-        .route("/upload", post(upload));
+        .route("/upload", post(upload))
+        .route("/image/:id", get(image_handler));
 
     // Start application on localhost:3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -131,4 +127,62 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
     // end test image conversion
 
     return Ok(());
+}
+
+#[derive(Deserialize)]
+struct ImageQuery {
+    width: Option<u32>,
+    height: Option<u32>,
+    quality: Option<u32>,
+}
+
+// This handler should serve images with the given id from the filesystem
+// The handler should also accept query parameters for width, height and quality
+// Images are resized, and compressed using vips
+async fn image_handler(
+    Path(id): Path<Uuid>,
+    query: Option<Query<ImageQuery>>
+) -> Result<Bytes, (StatusCode, String)> {
+
+    // check id
+    if id.is_nil() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid id!".to_owned(),
+        ));
+    }
+
+    let mut quality = 80;
+    let mut width = 1920;
+    let mut height = 1080;
+
+    query.map(|q| {
+        let q = q.0;
+        if q.width.is_some() {
+            width = q.width.unwrap();
+        }
+        if q.height.is_some() {
+            height = q.height.unwrap();
+        }
+        if q.quality.is_some() {
+            quality = q.quality.unwrap();
+        }
+    });
+
+    let path = "uploads/".to_owned() + &id.to_string() + ".webp";
+
+    // check if file exists and send error if it does not (json)
+    let metadata = fs::metadata(&path);
+    if metadata.is_err() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "Image not found!".to_owned(),
+        ));
+    }
+
+    let _metadata = metadata.unwrap();
+    let _image = VipsImage::new_from_file(&path).unwrap();
+
+    // just return empty bytes
+    return Ok(Bytes::new());
 }
