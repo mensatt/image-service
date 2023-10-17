@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::{ffi::OsStr, fs, io, net::SocketAddr, path::Path};
+use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -56,6 +56,20 @@ async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)
 
     if data.len() == 0 {
         return Err((StatusCode::BAD_REQUEST, "Empty file provided!".to_owned()));
+    }
+
+    // Read the env. variable MAX_UPLOAD_SIZE_MB (integer) and parse it. Defaults to 10mb
+    let max_upload_size_mb = env::var("MAX_UPLOAD_SIZE_MB")
+        .unwrap_or("10".to_string())
+        .parse::<usize>()
+        .unwrap_or(10);
+
+    // Check if data is too large
+    if data.len() > max_upload_size_mb * 1000 * 1000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("File too large! Max. size is {}MB", max_upload_size_mb),
+        ));
     }
 
     let extension = Path::new(&name).extension().and_then(OsStr::to_str);
