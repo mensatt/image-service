@@ -1,9 +1,17 @@
-use axum::{body::Bytes, extract::Multipart, http::StatusCode, response::Html, routing::{get, post}, Router, extract};
-use std::{env, ffi::OsStr, fs, io, net::SocketAddr};
-use extract::{Path, Query}; // <- this import breaks stuff as Path is also in axum
+use axum::{
+    body::{Bytes, StreamBody},
+    extract::{Multipart, Path, Query},
+    http::{header, StatusCode},
+    response::{Html, IntoResponse},
+    routing::{get, post},
+    Router,
+};
+
 use libvips::{ops, VipsApp, VipsImage};
-use uuid::Uuid;
 use serde::Deserialize;
+use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path as StdPath};
+use tokio_util::io::ReaderStream;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
@@ -72,7 +80,7 @@ async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)
         ));
     }
 
-    let extension = Path::new(&name).extension().and_then(OsStr::to_str);
+    let extension = StdPath::new(&name).extension().and_then(OsStr::to_str);
     if extension.is_none() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -110,12 +118,11 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
 
     log::info!("Saved '{}'", new_name);
 
-    // test image conversion
-    let image = VipsImage::new_from_buffer(&data, &*"").unwrap();
+    let image = VipsImage::new_from_buffer(&data, "").unwrap();
 
     let webp_name = "uploads/".to_owned() + &uuid.to_string() + ".webp";
 
-    let rotated = ops::rotate(&image, 90.0).unwrap();
+    let rotated = ops::rotate(&image, 0.0).unwrap();
     match ops::webpsave(&rotated, &webp_name) {
         Ok(_) => log::info!("Saved '{}'", webp_name),
         Err(error) => {
@@ -131,58 +138,114 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
 
 #[derive(Deserialize)]
 struct ImageQuery {
-    width: Option<u32>,
-    height: Option<u32>,
+    width: Option<i32>,
+    height: Option<i32>,
     quality: Option<u32>,
 }
 
-// This handler should serve images with the given id from the filesystem
-// The handler should also accept query parameters for width, height and quality
+// This handler serves images with the given id from the filesystem
+// It accepts optional query parameters for width, height and quality
 // Images are resized, and compressed using vips
-async fn image_handler(
-    Path(id): Path<Uuid>,
-    query: Option<Query<ImageQuery>>
-) -> Result<Bytes, (StatusCode, String)> {
-
-    // check id
+async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl IntoResponse {
+    // Check ID
     if id.is_nil() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid id!".to_owned(),
-        ));
+        return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
-
-    let mut quality = 80;
-    let mut width = 1920;
-    let mut height = 1080;
-
-    query.map(|q| {
-        let q = q.0;
-        if q.width.is_some() {
-            width = q.width.unwrap();
-        }
-        if q.height.is_some() {
-            height = q.height.unwrap();
-        }
-        if q.quality.is_some() {
-            quality = q.quality.unwrap();
-        }
-    });
 
     let path = "uploads/".to_owned() + &id.to_string() + ".webp";
 
-    // check if file exists and send error if it does not (json)
-    let metadata = fs::metadata(&path);
-    if metadata.is_err() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            "Image not found!".to_owned(),
-        ));
+    // Check if file exists and send error if it does not
+    if !StdPath::new(&path).exists() {
+        return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
     }
 
-    let _metadata = metadata.unwrap();
-    let _image = VipsImage::new_from_file(&path).unwrap();
+    let img_options = query.0;
+    let width = match img_options.width {
+        Some(width) => width,
+        None => return Err((StatusCode::BAD_REQUEST, "No width given!".to_owned())),
+    };
+    let height = match img_options.height {
+        Some(height) => height,
+        None => return Err((StatusCode::BAD_REQUEST, "No height given!".to_owned())),
+    };
+    let quality = match img_options.quality {
+        Some(quality) => quality,
+        None => 100,
+    };
 
-    // just return empty bytes
-    return Ok(Bytes::new());
+    match manipulate_image(&path, height, width, quality) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while processing image!".to_owned(),
+            ));
+        }
+        Ok(ign) => ign,
+    };
+
+    // TODO: Extract to constant
+    let path = "temp.jpg";
+    let filename = "temp.jpg";
+    let file = match tokio::fs::File::open(path).await {
+        Ok(file) => file,
+        Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
+    };
+    let content_type = match mime_guess::from_path(&path).first_raw() {
+        Some(mime) => mime,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "MIME Type couldn't be determined".to_string(),
+            ))
+        }
+    };
+
+    let stream = ReaderStream::new(file);
+    let body = StreamBody::new(stream);
+
+    let headers = [
+        (header::CONTENT_TYPE, content_type.to_owned()),
+        (
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{:?}\"", filename),
+        ),
+    ];
+    return Ok((headers, body));
+}
+
+fn manipulate_image(
+    path: &str,
+    height: i32,
+    width: i32,
+    quality: u32,
+) -> Result<(), libvips::error::Error> {
+    let thumb_opts = ops::ThumbnailOptions {
+        height: height,
+        // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
+        import_profile: "sRGB".into(),
+        export_profile: "sRGB".into(),
+        crop: ops::Interesting::Centre,
+        ..ops::ThumbnailOptions::default()
+    };
+    let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(img) => img,
+    };
+
+    // TODO: Implement quality resizing
+
+    // TODO: Figure out if there is a better way of passing the image.
+    // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
+    match image.image_write_to_file("temp.jpg") {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(img) => img,
+    };
+    return Ok(());
 }
