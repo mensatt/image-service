@@ -159,14 +159,25 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
     }
 
+    let img_dim = match determine_img_dim(&path) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while getting image dimensions".to_owned(),
+            ));
+        }
+        Ok(img_dim) => img_dim,
+    };
+
     let img_options = query.0;
     let width = match img_options.width {
         Some(width) => width,
-        None => return Err((StatusCode::BAD_REQUEST, "No width given!".to_owned())),
+        None => img_dim.0,
     };
     let height = match img_options.height {
         Some(height) => height,
-        None => return Err((StatusCode::BAD_REQUEST, "No height given!".to_owned())),
+        None => img_dim.1,
     };
     let quality = match img_options.quality {
         Some(quality) => quality,
@@ -212,6 +223,17 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         ),
     ];
     return Ok((headers, body));
+}
+
+fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error> {
+    let img = match VipsImage::new_from_file(path) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(img) => img,
+    };
+    return Ok((img.get_width(), img.get_height()));
 }
 
 fn manipulate_image(
