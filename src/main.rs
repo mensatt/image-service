@@ -1,17 +1,18 @@
-use axum::{
-    body::{Bytes, StreamBody},
-    extract::{Multipart, Path, Query},
-    http::{header, StatusCode},
-    response::{Html, IntoResponse},
-    routing::{get, post},
-    Router,
-};
+use axum::{body::{Bytes, StreamBody}, extract::{Multipart, Path, Query}, http::{header, StatusCode}, response::{Html, IntoResponse}, routing::{get, post}, Router, BoxError};
 
 use libvips::{ops, VipsApp, VipsImage};
 use serde::Deserialize;
 use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path as StdPath};
+use axum::extract::DefaultBodyLimit;
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
+
+const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
+
+// Custom error handler that is called when the content length limit is exceeded
+async fn content_length_limit_exceeded_handler() -> (StatusCode, &'static str) {
+    (StatusCode::PAYLOAD_TOO_LARGE, "Content-Length limit exceeded!")
+}
 
 #[tokio::main]
 async fn main() {
@@ -22,9 +23,11 @@ async fn main() {
 
     // Create Router with index and upload endpoints
     let app = Router::new()
-        .route("/", get(handler))
-        // TODO: Endpoint for image queries
-        .route("/upload", post(upload))
+        .route("/", get(root_handler))
+        .route("/upload", post(upload_handler))
+        //.layer(DefaultBodyLimit::disable())
+        .layer(DefaultBodyLimit::max(CONTENT_LENGTH_LIMIT))
+        // .map_err(content_length_limit_exceeded_handler)
         .route("/image/:id", get(image_handler));
 
     // Start application on localhost:3000
@@ -36,7 +39,7 @@ async fn main() {
         .unwrap();
 }
 
-async fn handler() -> Html<&'static str> {
+async fn root_handler() -> Html<&'static str> {
     Html(
         "<h1>This is the image service of Mensatt.</h1>
         <p>Upload pictures at <a href=\"/uploads\">/uploads</a>.</p>
@@ -45,7 +48,7 @@ async fn handler() -> Html<&'static str> {
     )
 }
 
-async fn upload(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
+async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
     let field = multipart.next_field().await;
     if field.is_err() {
         return Err((StatusCode::BAD_REQUEST, "No fields provided!".to_owned()));
@@ -208,7 +211,7 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
             return Err((
                 StatusCode::BAD_REQUEST,
                 "MIME Type couldn't be determined".to_string(),
-            ))
+            ));
         }
     };
 
