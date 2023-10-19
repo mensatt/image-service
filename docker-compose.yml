@@ -1,0 +1,13 @@
+services:
+  mensatt-img:
+    build:
+      dockerfile: Dockerfile
+    container_name: mensatt-img
+    image: mensatt-img:latest
+    volumes:
+      - uploads:/uploads
+    ports:
+      - 3000:3000
+
+volumes:
+  uploads:
