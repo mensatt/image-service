@@ -11,7 +11,7 @@ use axum::{
 
 use libvips::{ops, VipsApp, VipsImage};
 use serde::Deserialize;
-use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path as StdPath};
+use std::{ffi::OsStr, fs, io, path::Path as StdPath};
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 
