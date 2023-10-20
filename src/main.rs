@@ -42,7 +42,7 @@ async fn main() {
         .route("/image/:id", get(image_handler));
 
     // Start application on localhost:3000
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = "0.0.0.0:3000".parse().expect("Unable to parse socket address");
     log::info!("Listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
