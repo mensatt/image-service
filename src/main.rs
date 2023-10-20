@@ -1,3 +1,5 @@
+mod image_utils;
+
 use axum::{
     body::{Bytes, StreamBody},
     extract::{DefaultBodyLimit, Multipart, Path, Query},
@@ -100,6 +102,14 @@ async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode,
         ));
     }
     let extension = extension.unwrap();
+
+    let file_type = image_utils::determine_file_type(&data);
+    if file_type.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "File type could not be determined or your file type is not supported!".to_owned(),
+        ));
+    }
 
     // TODO check if extensions are valid (only certain should be allowed)
 
