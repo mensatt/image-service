@@ -1,9 +1,15 @@
-use axum::{body::{Bytes, StreamBody}, extract::{Multipart, Path, Query}, http::{header, StatusCode}, response::{Html, IntoResponse}, routing::{get, post}, Router, BoxError};
+use axum::{
+    body::{Bytes, StreamBody},
+    extract::{DefaultBodyLimit, Multipart, Path, Query},
+    http::{header, StatusCode},
+    response::{Html, IntoResponse},
+    routing::{get, post},
+    Router,
+};
 
 use libvips::{ops, VipsApp, VipsImage};
 use serde::Deserialize;
 use std::{env, ffi::OsStr, fs, io, net::SocketAddr, path::Path as StdPath};
-use axum::extract::DefaultBodyLimit;
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 
@@ -11,7 +17,10 @@ const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
 
 // Custom error handler that is called when the content length limit is exceeded
 async fn content_length_limit_exceeded_handler() -> (StatusCode, &'static str) {
-    (StatusCode::PAYLOAD_TOO_LARGE, "Content-Length limit exceeded!")
+    (
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "Content-Length limit exceeded!",
+    )
 }
 
 #[tokio::main]
@@ -126,7 +135,14 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
     let webp_name = "uploads/".to_owned() + &uuid.to_string() + ".webp";
 
     let rotated = ops::rotate(&image, 0.0).unwrap();
-    match ops::webpsave(&rotated, &webp_name) {
+
+    let opts = ops::WebpsaveOptions {
+        // TODO: Do not convert images to webp on upload, save them as is
+        // WEBP-lossless only inflates image (tested 1.3 MB JPEG => ~3 MB WEBP)
+        // lossless: true,
+        ..ops::WebpsaveOptions::default()
+    };
+    match ops::webpsave_with_opts(&rotated, &webp_name, &opts) {
         Ok(_) => log::info!("Saved '{}'", webp_name),
         Err(error) => {
             log::error!("Error while writing '{}': {}", webp_name, error);
@@ -143,7 +159,7 @@ fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::E
 struct ImageQuery {
     width: Option<i32>,
     height: Option<i32>,
-    quality: Option<u32>,
+    quality: Option<i32>,
 }
 
 // This handler serves images with the given id from the filesystem
@@ -199,8 +215,8 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
     };
 
     // TODO: Extract to constant
-    let path = "temp.jpg";
-    let filename = "temp.jpg";
+    let path = "temp.webp";
+    let filename = "temp.webp";
     let file = match tokio::fs::File::open(path).await {
         Ok(file) => file,
         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
@@ -243,7 +259,7 @@ fn manipulate_image(
     path: &str,
     height: i32,
     width: i32,
-    quality: u32,
+    quality: i32,
 ) -> Result<(), libvips::error::Error> {
     let thumb_opts = ops::ThumbnailOptions {
         height: height,
@@ -261,11 +277,13 @@ fn manipulate_image(
         Ok(img) => img,
     };
 
-    // TODO: Implement quality resizing
-
     // TODO: Figure out if there is a better way of passing the image.
     // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
-    match image.image_write_to_file("temp.jpg") {
+    let opts = ops::WebpsaveOptions {
+        q: quality,
+        ..ops::WebpsaveOptions::default()
+    };
+    match ops::webpsave_with_opts(&image, "temp.webp", &opts) {
         Err(err) => {
             log::error!("{}", err);
             return Err(err);
