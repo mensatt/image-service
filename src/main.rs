@@ -1,7 +1,7 @@
 mod image_utils;
 
 use axum::{
-    body::{Bytes, StreamBody},
+    body::StreamBody,
     extract::{DefaultBodyLimit, Multipart, Path, Query},
     http::{header, StatusCode},
     response::{Html, IntoResponse},
@@ -9,9 +9,10 @@ use axum::{
     Router,
 };
 
-use libvips::{ops, VipsApp, VipsImage};
+use image_utils::{determine_file_type, determine_img_dim, manipulate_image, save_unmodified};
+use libvips::VipsApp;
 use serde::Deserialize;
-use std::{ffi::OsStr, fs, io, path::Path as StdPath};
+use std::{ffi::OsStr, path::Path as StdPath};
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 
@@ -21,6 +22,7 @@ const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
 async fn main() {
     env_logger::init();
 
+    // Initialize libvips App
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
     libvips.concurrency_set(2);
 
@@ -52,17 +54,16 @@ async fn root_handler() -> Html<&'static str> {
 }
 
 async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
-    let field = multipart.next_field().await;
-    if field.is_err() {
-        return Err((StatusCode::BAD_REQUEST, "No fields provided!".to_owned()));
-    }
-    let field = field.unwrap();
-
-    if field.is_none() {
-        // TODO: Figure out if/when this can occur
-        return Err((StatusCode::BAD_REQUEST, "Placeholder".to_owned()));
-    }
-    let field = field.unwrap();
+    let field = match multipart.next_field().await {
+        Err(err) => {
+            log::error!("{}", err.body_text());
+            return Err((StatusCode::BAD_REQUEST, "No fields provided!".to_owned()));
+        }
+        Ok(next_field) => match next_field {
+            None => return Err((StatusCode::BAD_REQUEST, "No fields provided!".to_owned())),
+            Some(field) => field,
+        },
+    };
 
     let name = field.name().unwrap().to_string();
     let data = match field.bytes().await {
@@ -89,75 +90,42 @@ async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode,
         return Err((StatusCode::BAD_REQUEST, "Empty file provided!".to_owned()));
     }
 
-    let extension = StdPath::new(&name).extension().and_then(OsStr::to_str);
-    if extension.is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Filename has no extension!".to_owned(),
-        ));
-    }
-    let extension = extension.unwrap();
+    let extension = match StdPath::new(&name).extension().and_then(OsStr::to_str) {
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Filename has no extension!".to_owned(),
+            ))
+        }
+        Some(ext) => ext,
+    };
 
-    let file_type = image_utils::determine_file_type(&data);
-    if file_type.is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "File type could not be determined or your file type is not supported!".to_owned(),
-        ));
-    }
+    let file_type = match determine_file_type(&data) {
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "File type could not be determined or your file type is not supported!".to_owned(),
+            ))
+        }
+        Some(file_type) => file_type,
+    };
 
     // TODO check if extensions are valid (only certain should be allowed)
 
     let id = Uuid::new_v4();
 
-    let return_value = save_unmodified(data, id, extension);
-    if return_value.is_err() {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "An internal error has occurred!".to_owned(),
-        ));
-    }
-
-    // TODO: rotate and convert to webp
-    return Ok(id.to_string());
-}
-
-fn save_unmodified(data: Bytes, uuid: Uuid, extension: &str) -> Result<(), io::Error> {
-    // TODO: Path should likely be constructed with some sort of OS util
-    let new_name = "uploads/".to_owned() + &uuid.to_string() + "." + extension;
-
-    let return_value = fs::write(&new_name, &data);
-    if return_value.is_err() {
-        let error = return_value.err().unwrap();
-        log::error!("Error while writing '{}': {}", new_name, error);
-        return Err(error);
-    }
-
-    log::info!("Saved '{}'", new_name);
-
-    let image = VipsImage::new_from_buffer(&data, "").unwrap();
-
-    let webp_name = "uploads/".to_owned() + &uuid.to_string() + ".webp";
-
-    let rotated = ops::rotate(&image, 0.0).unwrap();
-
-    let opts = ops::WebpsaveOptions {
-        // TODO: Do not convert images to webp on upload, save them as is
-        // WEBP-lossless only inflates image (tested 1.3 MB JPEG => ~3 MB WEBP)
-        // lossless: true,
-        ..ops::WebpsaveOptions::default()
-    };
-    match ops::webpsave_with_opts(&rotated, &webp_name, &opts) {
-        Ok(_) => log::info!("Saved '{}'", webp_name),
-        Err(error) => {
-            log::error!("Error while writing '{}': {}", webp_name, error);
-            // todo: return an error
+    match save_unmodified(data, id, extension, 0.0) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "An internal error has occurred!".to_owned(),
+            ));
         }
-    }
+        Ok(_) => (),
+    };
 
-    // end test image conversion
-
-    return Ok(());
+    return Ok(id.to_string());
 }
 
 #[derive(Deserialize)]
@@ -247,53 +215,4 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         ),
     ];
     return Ok((headers, body));
-}
-
-fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error> {
-    let img = match VipsImage::new_from_file(path) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err(err);
-        }
-        Ok(img) => img,
-    };
-    return Ok((img.get_width(), img.get_height()));
-}
-
-fn manipulate_image(
-    path: &str,
-    height: i32,
-    width: i32,
-    quality: i32,
-) -> Result<(), libvips::error::Error> {
-    let thumb_opts = ops::ThumbnailOptions {
-        height: height,
-        // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
-        import_profile: "sRGB".into(),
-        export_profile: "sRGB".into(),
-        crop: ops::Interesting::Centre,
-        ..ops::ThumbnailOptions::default()
-    };
-    let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err(err);
-        }
-        Ok(img) => img,
-    };
-
-    // TODO: Figure out if there is a better way of passing the image.
-    // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
-    let opts = ops::WebpsaveOptions {
-        q: quality,
-        ..ops::WebpsaveOptions::default()
-    };
-    match ops::webpsave_with_opts(&image, "temp.webp", &opts) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err(err);
-        }
-        Ok(img) => img,
-    };
-    return Ok(());
 }
