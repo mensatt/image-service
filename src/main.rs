@@ -1,7 +1,6 @@
 mod image_utils;
 
 use axum::{
-    body::StreamBody,
     extract::{DefaultBodyLimit, Multipart, Path, Query},
     http::{header, StatusCode},
     response::{Html, IntoResponse},
@@ -9,11 +8,12 @@ use axum::{
     Router,
 };
 
-use image_utils::{determine_file_type, determine_img_dim, manipulate_image, save_unmodified};
+use image_utils::{
+    determine_file_type, determine_img_dim, determine_img_path, manipulate_image, save_unmodified,
+};
 use libvips::VipsApp;
 use serde::Deserialize;
-use std::{ffi::OsStr, path::Path as StdPath};
-use tokio_util::io::ReaderStream;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
@@ -53,7 +53,15 @@ async fn root_handler() -> Html<&'static str> {
     )
 }
 
-async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode, String)> {
+#[derive(Deserialize)]
+struct UploadQuery {
+    angle: Option<f64>,
+}
+
+async fn upload_handler(
+    query: Query<UploadQuery>,
+    mut multipart: Multipart,
+) -> Result<String, (StatusCode, String)> {
     let field = match multipart.next_field().await {
         Err(err) => {
             log::error!("{}", err.body_text());
@@ -90,31 +98,23 @@ async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode,
         return Err((StatusCode::BAD_REQUEST, "Empty file provided!".to_owned()));
     }
 
-    let extension = match StdPath::new(&name).extension().and_then(OsStr::to_str) {
-        None => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Filename has no extension!".to_owned(),
-            ))
-        }
-        Some(ext) => ext,
+    let uuid = Uuid::new_v4();
+    let angle = match query.angle {
+        Some(x) => x,
+        None => 0.0,
     };
 
-    let file_type = match determine_file_type(&data) {
+    let file_identification = match determine_file_type(&data) {
         None => {
             return Err((
                 StatusCode::BAD_REQUEST,
                 "File type could not be determined or your file type is not supported!".to_owned(),
             ))
         }
-        Some(file_type) => file_type,
+        Some(file_ident) => file_ident,
     };
 
-    // TODO check if extensions are valid (only certain should be allowed)
-
-    let id = Uuid::new_v4();
-
-    match save_unmodified(data, id, extension, 0.0) {
+    match save_unmodified(&data, uuid, file_identification, angle) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -125,7 +125,7 @@ async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode,
         Ok(_) => (),
     };
 
-    return Ok(id.to_string());
+    return Ok(uuid.to_string());
 }
 
 #[derive(Deserialize)]
@@ -144,12 +144,10 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let path = "uploads/".to_owned() + &id.to_string() + ".webp";
-
-    // Check if file exists and send error if it does not
-    if !StdPath::new(&path).exists() {
-        return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    }
+    let path = match determine_img_path(id) {
+        Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
+        Ok(str) => str,
+    };
 
     let img_dim = match determine_img_dim(&path) {
         Err(err) => {
@@ -176,7 +174,7 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         None => 100,
     };
 
-    match manipulate_image(&path, height, width, quality) {
+    let buf = match manipulate_image(&path, height, width, quality) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -184,35 +182,33 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
                 "Error while processing image!".to_owned(),
             ));
         }
-        Ok(ign) => ign,
+        Ok(buf) => buf,
     };
 
-    // TODO: Extract to constant
-    let path = "temp.webp";
-    let filename = "temp.webp";
-    let file = match tokio::fs::File::open(path).await {
-        Ok(file) => file,
-        Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
-    };
-    let content_type = match mime_guess::from_path(&path).first_raw() {
-        Some(mime) => mime,
+    let webp_name = match PathBuf::from(path).file_stem() {
         None => {
             return Err((
-                StatusCode::BAD_REQUEST,
-                "MIME Type couldn't be determined".to_string(),
-            ));
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while processing image!".to_owned(),
+            ))
         }
+        Some(os_str) => match os_str.to_str() {
+            None => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error while processing image!".to_owned(),
+                ))
+            }
+            Some(stem) => stem.to_owned() + ".webp",
+        },
     };
 
-    let stream = ReaderStream::new(file);
-    let body = StreamBody::new(stream);
-
     let headers = [
-        (header::CONTENT_TYPE, content_type.to_owned()),
+        (header::CONTENT_TYPE, "image/webp".to_owned()),
         (
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{:?}\"", filename),
+            format!("attachment; filename={:?}", webp_name),
         ),
     ];
-    return Ok((headers, body));
+    return Ok((headers, buf));
 }

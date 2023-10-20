@@ -1,5 +1,4 @@
-use core::fmt;
-use std::{fs, io};
+use std::{io, path::PathBuf};
 
 use axum::body::Bytes;
 use libvips::{ops, VipsImage};
@@ -69,74 +68,46 @@ func isMagicNumberValid(image []byte, magicNumber []byte) bool {
 }
 
  */
-pub fn determine_file_type(image: &[u8]) -> Option<&FileIdentification> {
+pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
     FILE_MAPPINGS
         .iter()
         .find(|&mapping| image.starts_with(mapping.file_header))
 }
 
-pub enum SaveError {
-    IOError(io::Error),
-    LibError(libvips::error::Error),
-}
-impl fmt::Display for SaveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SaveError::IOError(err) => err.fmt(f),
-            SaveError::LibError(err) => err.fmt(f),
-        }
-    }
-}
-
 pub fn save_unmodified(
-    data: Bytes,
+    data: &Bytes,
     uuid: Uuid,
-    extension: &str,
+    file_identification: &FileIdentification,
     angle: f64,
-) -> Result<(), SaveError> {
-    // TODO: Path should likely be constructed with some sort of OS util
-    let new_name = "uploads/".to_owned() + &uuid.to_string() + "." + extension;
-    let webp_name = "uploads/".to_owned() + &uuid.to_string() + ".webp";
+) -> Result<(), libvips::error::Error> {
+    let path =
+        PathBuf::from("uploads").join(uuid.to_string() + "." + file_identification.file_extension);
+    let path_str = path.to_str().unwrap();
+    log::info!("{}", path_str);
 
-    match fs::write(&new_name, &data) {
-        Err(err) => {
-            log::error!("Error while writing '{}': {}", new_name, err);
-            return Err(SaveError::IOError(err));
-        }
-        Ok(_) => (),
-    };
-
-    log::info!("Saved '{}'", new_name);
-
-    let image = match VipsImage::new_from_buffer(&data, "") {
+    let image = match VipsImage::new_from_buffer(data, "") {
         Err(err) => {
             log::error!("Error while reading image from buffer: {}", err);
-            return Err(SaveError::LibError(err));
+            return Err(err);
         }
         Ok(img) => img,
     };
 
     let rotated = match ops::rotate(&image, angle) {
         Err(err) => {
-            log::error!("Error while rotating '{}': {}", new_name, err);
-            return Err(SaveError::LibError(err));
+            log::error!("Error while rotating '{}': {}", path_str, err);
+            return Err(err);
         }
         Ok(img) => img,
     };
 
-    let opts = ops::WebpsaveOptions {
-        // TODO: Do not convert images to webp on upload, save them as is
-        // WEBP-lossless only inflates image (tested 1.3 MB JPEG => ~3 MB WEBP)
-        // lossless: true,
-        ..ops::WebpsaveOptions::default()
-    };
-    match ops::webpsave_with_opts(&rotated, &webp_name, &opts) {
-        Ok(_) => log::info!("Saved '{}'", webp_name),
+    match rotated.image_write_to_file(path_str) {
         Err(err) => {
-            log::error!("Error while writing '{}': {}", webp_name, err);
-            return Err(SaveError::LibError(err));
+            log::error!("Eror while saving '{}': {}", path_str, err);
+            return Err(err);
         }
-    }
+        Ok(_) => log::info!("Saved '{}'", path_str),
+    };
 
     return Ok(());
 }
@@ -151,12 +122,25 @@ pub fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error
     };
 }
 
+pub fn determine_img_path(uuid: Uuid) -> Result<String, io::Error> {
+    for mapping in FILE_MAPPINGS {
+        let buf = PathBuf::from("uploads").join(uuid.to_string() + "." + mapping.file_extension);
+        if buf.exists() {
+            return Ok(buf.to_str().unwrap().to_string());
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("No image with UUID '{}'", uuid),
+    ))
+}
+
 pub fn manipulate_image(
     path: &str,
     height: i32,
     width: i32,
     quality: i32,
-) -> Result<(), libvips::error::Error> {
+) -> Result<Vec<u8>, libvips::error::Error> {
     let thumb_opts = ops::ThumbnailOptions {
         height: height,
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
@@ -179,6 +163,18 @@ pub fn manipulate_image(
         q: quality,
         ..ops::WebpsaveOptions::default()
     };
+
+    let webpsave_buffer_options = ops::WebpsaveBufferOptions {
+        q: quality,
+        ..ops::WebpsaveBufferOptions::default()
+    };
+    let buffer: Vec<u8> = match ops::webpsave_buffer_with_opts(&image, &webpsave_buffer_options) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(vec) => vec,
+    };
     match ops::webpsave_with_opts(&image, "temp.webp", &opts) {
         Err(err) => {
             log::error!("{}", err);
@@ -186,5 +182,5 @@ pub fn manipulate_image(
         }
         Ok(img) => img,
     };
-    return Ok(());
+    return Ok(buffer);
 }
