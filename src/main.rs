@@ -17,14 +17,6 @@ use uuid::Uuid;
 
 const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
 
-// Custom error handler that is called when the content length limit is exceeded
-async fn content_length_limit_exceeded_handler() -> (StatusCode, &'static str) {
-    (
-        StatusCode::PAYLOAD_TOO_LARGE,
-        "Content-Length limit exceeded!",
-    )
-}
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -36,13 +28,13 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/upload", post(upload_handler))
-        //.layer(DefaultBodyLimit::disable())
         .layer(DefaultBodyLimit::max(CONTENT_LENGTH_LIMIT))
-        // .map_err(content_length_limit_exceeded_handler)
         .route("/image/:id", get(image_handler));
 
     // Start application on localhost:3000
-    let addr = "0.0.0.0:3000".parse().expect("Unable to parse socket address");
+    let addr = "0.0.0.0:3000"
+        .parse()
+        .expect("Unable to parse socket address");
     log::info!("Listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -73,26 +65,29 @@ async fn upload_handler(mut multipart: Multipart) -> Result<String, (StatusCode,
     let field = field.unwrap();
 
     let name = field.name().unwrap().to_string();
-    let data = field.bytes().await.unwrap();
+    let data = match field.bytes().await {
+        Err(err) => {
+            log::error!("{}", err.body_text());
+            match err.status() {
+                StatusCode::PAYLOAD_TOO_LARGE => {
+                    return Err((
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        format!(
+                            "Content length limit exceeded!. Max allowed file size is {}B",
+                            CONTENT_LENGTH_LIMIT
+                        ),
+                    ));
+                }
+                _ => return Err((err.status(), "An error occurred your request".to_owned())),
+            }
+        }
+        Ok(data) => data,
+    };
     log::info!("Received '{}' with size {}B", name, data.len());
 
     if data.len() == 0 {
         return Err((StatusCode::BAD_REQUEST, "Empty file provided!".to_owned()));
     }
-
-    // // Read the env. variable MAX_UPLOAD_SIZE_MB (integer) and parse it. Defaults to 10mb
-    // let max_upload_size_mb = env::var("MAX_UPLOAD_SIZE_MB")
-    //     .unwrap_or("10".to_string())
-    //     .parse::<usize>()
-    //     .unwrap_or(10);
-    //
-    // // Check if data is too large
-    // if data.len() > max_upload_size_mb * 1000 * 1000 {
-    //     return Err((
-    //         StatusCode::BAD_REQUEST,
-    //         format!("File too large! Max. size is {}MB", max_upload_size_mb),
-    //     ));
-    // }
 
     let extension = StdPath::new(&name).extension().and_then(OsStr::to_str);
     if extension.is_none() {
