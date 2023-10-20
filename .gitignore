@@ -2,5 +2,19 @@
 .vscode/
 
 /target
-/uploads/*
-!/uploads/.gitkeep
+
+# Ignore all files and folders in data, except .gitkeep files in the
+# subfolders cache, originals, pending and uploads
+/data/*
+!/data/cache/
+!/data/originals/
+!/data/pending/
+!/data/uploads/
+/data/cache/*
+/data/originals/*
+/data/pending/*
+/data/uploads/*
+!/data/cache/.gitkeep
+!/data/originals/.gitkeep
+!/data/pending/.gitkeep
+!/data/uploads/.gitkeep
