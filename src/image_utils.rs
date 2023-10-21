@@ -1,4 +1,8 @@
-use std::{io, path::PathBuf};
+use std::{
+    fs::metadata,
+    io,
+    path::{Path, PathBuf},
+};
 
 use axum::body::Bytes;
 use libvips::{ops, VipsImage};
@@ -171,27 +175,35 @@ pub fn manipulate_image(
     };
 
     // Also write image to cache
-    // let cache_entry = PathBuf::from("data").join("cache").join(format!(
-    //     "{}-{}x{}-{}.webp",
-    //     PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
-    //     width,
-    //     height,
-    //     quality
-    // ));
+    let cache_entry = get_cache_entry(
+        PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
+        height,
+        width,
+        quality,
+    );
 
-    // TODO: Figure out if there is a better way of passing the image.
-    // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
-    // let opts = ops::WebpsaveOptions {
-    //     q: quality,
-    //     ..ops::WebpsaveOptions::default()
-    // };
-    // match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
-    //     Err(err) => {
-    //         log::error!("{}", err);
-    //         return Err(err);
-    //     }
-    //     Ok(img) => img,
-    // };
+    let opts = ops::WebpsaveOptions {
+        q: quality,
+        ..ops::WebpsaveOptions::default()
+    };
+    match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(img) => img,
+    };
 
     return Ok(buffer);
+}
+
+pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> PathBuf {
+    return PathBuf::from("data")
+        .join("cache")
+        .join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality));
+}
+
+pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
+    let cache_entry = get_cache_entry(&uuid.to_string(), height, width, quality);
+    return cache_entry.exists();
 }

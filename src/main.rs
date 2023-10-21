@@ -9,11 +9,15 @@ use axum::{
 };
 
 use image_utils::{
-    determine_file_type, determine_img_dim, determine_img_path, manipulate_image, save_unmodified,
+    check_cache, determine_file_type, determine_img_dim, determine_img_path, get_cache_entry,
+    manipulate_image, save_unmodified,
 };
 use libvips::VipsApp;
 use serde::Deserialize;
-use std::{fs::rename, path::PathBuf};
+use std::{
+    fs::{read, rename},
+    path::PathBuf,
+};
 use uuid::Uuid;
 
 const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
@@ -147,8 +151,6 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
 
     let base_dir = PathBuf::from("data");
 
-    // TODO: Check cache
-
     let path = match determine_img_path(base_dir.join("originals").to_str().unwrap(), id) {
         Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
         Ok(str) => str,
@@ -179,43 +181,29 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         None => 100,
     };
 
-    let buf = match manipulate_image(path.to_str().unwrap(), height, width, quality) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while processing image!".to_owned(),
-            ));
-        }
-        Ok(buf) => buf,
-    };
-
-    let webp_name = match PathBuf::from(path).file_stem() {
-        None => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while processing image!".to_owned(),
-            ))
-        }
-        Some(os_str) => match os_str.to_str() {
-            None => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error while processing image!".to_owned(),
-                ))
-            }
-            Some(stem) => stem.to_owned() + ".webp",
-        },
-    };
-
     let headers = [
         (header::CONTENT_TYPE, "image/webp".to_owned()),
         (
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename={:?}", webp_name),
+            format!("attachment; filename={:?}.webp", id),
         ),
     ];
-    return Ok((headers, buf));
+
+    let body = match check_cache(id, height, width, quality) {
+        true => read(get_cache_entry(&id.to_string(), height, width, quality)).unwrap(),
+        false => match manipulate_image(path.to_str().unwrap(), height, width, quality) {
+            Err(err) => {
+                log::error!("{}", err);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error while processing image!".to_owned(),
+                ));
+            }
+            Ok(buf) => buf,
+        },
+    };
+
+    return Ok((headers, body));
 }
 
 // TODO: Add auth
@@ -234,7 +222,7 @@ async fn approve_handler(Path(uuid): Path<Uuid>) -> Result<String, (StatusCode, 
     };
 
     let target_path = base_path
-        .join("original")
+        .join("originals")
         .join(source_path.file_name().unwrap().to_str().unwrap());
 
     match rename(&source_path, &target_path) {
