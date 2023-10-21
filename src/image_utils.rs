@@ -80,8 +80,9 @@ pub fn save_unmodified(
     file_identification: &FileIdentification,
     angle: f64,
 ) -> Result<(), libvips::error::Error> {
-    let path =
-        PathBuf::from("uploads").join(uuid.to_string() + "." + file_identification.file_extension);
+    let path = PathBuf::from("data")
+        .join("uploads")
+        .join(uuid.to_string() + "." + file_identification.file_extension);
     let path_str = path.to_str().unwrap();
     log::info!("{}", path_str);
 
@@ -122,11 +123,11 @@ pub fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error
     };
 }
 
-pub fn determine_img_path(uuid: Uuid) -> Result<String, io::Error> {
+pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error> {
     for mapping in FILE_MAPPINGS {
-        let buf = PathBuf::from("uploads").join(uuid.to_string() + "." + mapping.file_extension);
+        let buf = PathBuf::from(folder).join(uuid.to_string() + "." + mapping.file_extension);
         if buf.exists() {
-            return Ok(buf.to_str().unwrap().to_string());
+            return Ok(buf);
         }
     }
     Err(io::Error::new(
@@ -157,13 +158,6 @@ pub fn manipulate_image(
         Ok(img) => img,
     };
 
-    // TODO: Figure out if there is a better way of passing the image.
-    // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
-    let opts = ops::WebpsaveOptions {
-        q: quality,
-        ..ops::WebpsaveOptions::default()
-    };
-
     let webpsave_buffer_options = ops::WebpsaveBufferOptions {
         q: quality,
         ..ops::WebpsaveBufferOptions::default()
@@ -175,12 +169,29 @@ pub fn manipulate_image(
         }
         Ok(vec) => vec,
     };
-    match ops::webpsave_with_opts(&image, "temp.webp", &opts) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err(err);
-        }
-        Ok(img) => img,
-    };
+
+    // Also write image to cache
+    // let cache_entry = PathBuf::from("data").join("cache").join(format!(
+    //     "{}-{}x{}-{}.webp",
+    //     PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
+    //     width,
+    //     height,
+    //     quality
+    // ));
+
+    // TODO: Figure out if there is a better way of passing the image.
+    // Ideas (tried but failed, worth investigating further): Returning image or writing to buffer
+    // let opts = ops::WebpsaveOptions {
+    //     q: quality,
+    //     ..ops::WebpsaveOptions::default()
+    // };
+    // match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
+    //     Err(err) => {
+    //         log::error!("{}", err);
+    //         return Err(err);
+    //     }
+    //     Ok(img) => img,
+    // };
+
     return Ok(buffer);
 }

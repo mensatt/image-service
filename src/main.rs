@@ -13,7 +13,7 @@ use image_utils::{
 };
 use libvips::VipsApp;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{fs::rename, path::PathBuf};
 use uuid::Uuid;
 
 const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
@@ -31,7 +31,8 @@ async fn main() {
         .route("/", get(root_handler))
         .route("/upload", post(upload_handler))
         .layer(DefaultBodyLimit::max(CONTENT_LENGTH_LIMIT))
-        .route("/image/:id", get(image_handler));
+        .route("/image/:id", get(image_handler))
+        .route("/approve/:id", post(approve_handler));
 
     // Start application on localhost:3000
     let addr = "0.0.0.0:3000"
@@ -144,12 +145,16 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let path = match determine_img_path(id) {
+    let base_dir = PathBuf::from("data");
+
+    // TODO: Check cache
+
+    let path = match determine_img_path(base_dir.join("originals").to_str().unwrap(), id) {
         Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
         Ok(str) => str,
     };
 
-    let img_dim = match determine_img_dim(&path) {
+    let img_dim = match determine_img_dim(path.to_str().unwrap()) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -174,7 +179,7 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         None => 100,
     };
 
-    let buf = match manipulate_image(&path, height, width, quality) {
+    let buf = match manipulate_image(path.to_str().unwrap(), height, width, quality) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -211,4 +216,37 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         ),
     ];
     return Ok((headers, buf));
+}
+
+// TODO: Add auth
+// TODO: Add cron pruning
+async fn approve_handler(Path(uuid): Path<Uuid>) -> Result<String, (StatusCode, String)> {
+    // Check ID
+    if uuid.is_nil() {
+        return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
+    }
+
+    let base_path = PathBuf::from("data");
+
+    let source_path = match determine_img_path(base_path.join("uploads").to_str().unwrap(), uuid) {
+        Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
+        Ok(str) => str,
+    };
+
+    let target_path = base_path
+        .join("original")
+        .join(source_path.file_name().unwrap().to_str().unwrap());
+
+    match rename(&source_path, &target_path) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while approving image!".to_owned(),
+            ));
+        }
+        Ok(_) => log::info!("Moved '{:?}' to '{:?}'", source_path, target_path),
+    };
+
+    Ok(uuid.to_string())
 }
