@@ -1,4 +1,6 @@
+mod constants;
 mod image_utils;
+mod path_utils;
 
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, Query},
@@ -10,17 +12,15 @@ use axum::{
 
 use image_utils::{
     check_cache, determine_file_type, determine_img_dim, determine_img_path, get_cache_entry,
-    manipulate_image, save_unmodified,
+    manipulate_image, save_pending,
 };
 use libvips::VipsApp;
+use path_utils::{get_original_path, get_pending_path};
 use serde::Deserialize;
-use std::{
-    fs::{read, rename},
-    path::PathBuf,
-};
+use std::fs::{read, rename};
 use uuid::Uuid;
 
-const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
+use crate::constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
 
 #[tokio::main]
 async fn main() {
@@ -38,22 +38,20 @@ async fn main() {
         .route("/image/:id", get(image_handler))
         .route("/approve/:id", post(approve_handler));
 
-    // Start application on localhost:3000
-    let addr = "0.0.0.0:3000"
-        .parse()
-        .expect("Unable to parse socket address");
-    log::info!("Listening on {}", addr);
-    axum::Server::bind(&addr)
+    log::info!("Listening on {}", LISTEN_ADDR);
+    axum::Server::bind(&LISTEN_ADDR)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
+/// A simple handler that prints information about this image service
 async fn root_handler() -> Html<&'static str> {
     Html(
         "<h1>This is the image service of Mensatt.</h1>
         <p>Upload pictures at <a href=\"/uploads\">/uploads</a>.</p>
-        <p>Request pictures at <a href=\"/placeholder\">/placeholder</a>.</p>
+        <p>Request pictures at <a href=\"/image\">/image/:id</a>.</p>
+        <p>Request pictures at <a href=\"/approve\">/approve/:id</a>.</p>
         ",
     )
 }
@@ -63,10 +61,18 @@ struct UploadQuery {
     angle: Option<f64>,
 }
 
+/// This function handles image uploads. An image is expected to be part of a multipart stream.\
+/// Only one image (the first field in the stream) is processed.
+///
+/// Arguments:
+///  - query: HTTP Query parameters
+///     - angle: To rotate image before saving. Default 0.
+///  - multipart: Multipart stream
 async fn upload_handler(
     query: Query<UploadQuery>,
     mut multipart: Multipart,
 ) -> Result<String, (StatusCode, String)> {
+    // Get first Multipart field
     let field = match multipart.next_field().await {
         Err(err) => {
             log::error!("{}", err.body_text());
@@ -78,6 +84,7 @@ async fn upload_handler(
         },
     };
 
+    // Get name and data from field
     let name = field.name().unwrap().to_string();
     let data = match field.bytes().await {
         Err(err) => {
@@ -119,7 +126,7 @@ async fn upload_handler(
         Some(file_ident) => file_ident,
     };
 
-    match save_unmodified(&data, uuid, file_identification, angle) {
+    match save_pending(&data, uuid, file_identification, angle) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -149,9 +156,7 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let base_dir = PathBuf::from("data");
-
-    let path = match determine_img_path(base_dir.join("originals").to_str().unwrap(), id) {
+    let path = match determine_img_path(get_original_path().to_str().unwrap(), id) {
         Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
         Ok(str) => str,
     };
@@ -214,16 +219,15 @@ async fn approve_handler(Path(uuid): Path<Uuid>) -> Result<String, (StatusCode, 
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let base_path = PathBuf::from("data");
-
-    let source_path = match determine_img_path(base_path.join("uploads").to_str().unwrap(), uuid) {
-        Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
+    let source_path = match determine_img_path(get_pending_path().to_str().unwrap(), uuid) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
+        }
         Ok(str) => str,
     };
 
-    let target_path = base_path
-        .join("originals")
-        .join(source_path.file_name().unwrap().to_str().unwrap());
+    let target_path = get_original_path().join(source_path.file_name().unwrap().to_str().unwrap());
 
     match rename(&source_path, &target_path) {
         Err(err) => {

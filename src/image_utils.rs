@@ -1,12 +1,10 @@
-use std::{
-    fs::metadata,
-    io,
-    path::{Path, PathBuf},
-};
+use std::{io, path::PathBuf};
 
 use axum::body::Bytes;
 use libvips::{ops, VipsImage};
 use uuid::Uuid;
+
+use crate::path_utils::{get_cache_path, get_pending_path};
 
 #[derive(Debug, PartialEq)]
 pub enum FileType {
@@ -78,15 +76,13 @@ pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
         .find(|&mapping| image.starts_with(mapping.file_header))
 }
 
-pub fn save_unmodified(
+pub fn save_pending(
     data: &Bytes,
     uuid: Uuid,
     file_identification: &FileIdentification,
     angle: f64,
 ) -> Result<(), libvips::error::Error> {
-    let path = PathBuf::from("data")
-        .join("uploads")
-        .join(uuid.to_string() + "." + file_identification.file_extension);
+    let path = get_pending_path().join(uuid.to_string() + "." + file_identification.file_extension);
     let path_str = path.to_str().unwrap();
     log::info!("{}", path_str);
 
@@ -198,9 +194,7 @@ pub fn manipulate_image(
 }
 
 pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> PathBuf {
-    return PathBuf::from("data")
-        .join("cache")
-        .join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality));
+    return get_cache_path().join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality));
 }
 
 pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
