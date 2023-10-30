@@ -9,12 +9,12 @@
 !/data/cache/
 !/data/originals/
 !/data/pending/
-!/data/uploads/
+!/data/unapproved/
 /data/cache/*
 /data/originals/*
 /data/pending/*
-/data/uploads/*
+/data/unapproved/*
 !/data/cache/.gitkeep
 !/data/originals/.gitkeep
 !/data/pending/.gitkeep
-!/data/uploads/.gitkeep
+!/data/unapproved/.gitkeep
