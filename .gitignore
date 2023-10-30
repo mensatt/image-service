@@ -2,6 +2,7 @@
 .vscode/
 
 /target
+/examples
 
 # Ignore all files and folders in data, except .gitkeep files in the
 # subfolders cache, originals, pending and uploads
