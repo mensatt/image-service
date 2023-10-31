@@ -12,6 +12,7 @@ pub enum FileType {
     PNG,
     WEBP,
     HEIF,
+    AVIF,
 }
 
 pub struct FileIdentification {
@@ -20,7 +21,7 @@ pub struct FileIdentification {
     file_header: &'static [u8],
 }
 
-const FILE_MAPPINGS: [FileIdentification; 4] = [
+const FILE_MAPPINGS: [FileIdentification; 5] = [
     FileIdentification {
         file_type: FileType::JPEG,
         file_extension: "jpg",
@@ -41,6 +42,13 @@ const FILE_MAPPINGS: [FileIdentification; 4] = [
         file_extension: "heic",
         file_header: &[
             0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
+        ],
+    },
+    FileIdentification {
+        file_type: FileType::AVIF,
+        file_extension: "avif",
+        file_header: &[
+            0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66,
         ],
     },
 ];
