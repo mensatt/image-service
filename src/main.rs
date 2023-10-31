@@ -116,17 +116,17 @@ async fn upload_handler(
         None => 0.0,
     };
 
-    let file_identification = match determine_file_type(&data) {
+    match determine_file_type(&data) {
         None => {
             return Err((
                 StatusCode::BAD_REQUEST,
                 "File type could not be determined or your file type is not supported!".to_owned(),
             ))
         }
-        Some(file_ident) => file_ident,
+        Some(_) => (),
     };
 
-    match save_pending(&data, uuid, file_identification, angle) {
+    match save_pending(&data, uuid, angle) {
         Err(err) => {
             log::error!("{}", err);
             return Err((

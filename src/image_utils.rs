@@ -1,10 +1,17 @@
+use core::fmt;
 use std::{io, path::PathBuf};
 
 use axum::body::Bytes;
-use libvips::{ops, VipsImage};
+use libvips::{
+    ops::{self, ForeignHeifCompression, HeifsaveOptions},
+    VipsImage,
+};
 use uuid::Uuid;
 
-use crate::path_utils::{get_cache_path, get_pending_path};
+use crate::{
+    constants::PENDING_QUAL,
+    path_utils::{get_cache_path, get_pending_path},
+};
 
 #[derive(Debug, PartialEq)]
 pub enum FileType {
@@ -19,6 +26,20 @@ pub struct FileIdentification {
     file_type: FileType,
     file_extension: &'static str,
     file_header: &'static [u8],
+}
+
+pub enum SaveError {
+    LibError(libvips::error::Error),
+    IOError(std::io::Error),
+}
+
+impl fmt::Display for SaveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LibError(err) => err.fmt(f),
+            Self::IOError(err) => err.fmt(f),
+        }
+    }
 }
 
 const FILE_MAPPINGS: [FileIdentification; 5] = [
@@ -53,51 +74,29 @@ const FILE_MAPPINGS: [FileIdentification; 5] = [
     },
 ];
 
-/*
-
-func isImageValid(image []byte) bool {
-    for _, magicNumber := range magicNumbers {
-        if isMagicNumberValid(image, magicNumber) {
-            return true
-        }
-    }
-    return false
-}
-
-func isMagicNumberValid(image []byte, magicNumber []byte) bool {
-    if len(image) < len(magicNumber) {
-        return false
-    }
-
-    for i := range magicNumber {
-        if image[i] != magicNumber[i] {
-            return false
-        }
-    }
-    return true
-}
-
- */
 pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
     FILE_MAPPINGS
         .iter()
         .find(|&mapping| image.starts_with(mapping.file_header))
 }
 
-pub fn save_pending(
-    data: &Bytes,
-    uuid: Uuid,
-    file_identification: &FileIdentification,
-    angle: f64,
-) -> Result<(), libvips::error::Error> {
-    let path = get_pending_path().join(uuid.to_string() + "." + file_identification.file_extension);
-    let path_str = path.to_str().unwrap();
+pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveError> {
+    let path = get_pending_path().join(format!("{}.avif", uuid.to_string()));
+    let path_str = match path.to_str() {
+        Some(str) => str,
+        None => {
+            return Err(SaveError::IOError(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "error",
+            )))
+        }
+    };
     log::info!("{}", path_str);
 
     let image = match VipsImage::new_from_buffer(data, "") {
         Err(err) => {
             log::error!("Error while reading image from buffer: {}", err);
-            return Err(err);
+            return Err(SaveError::LibError(err));
         }
         Ok(img) => img,
     };
@@ -105,15 +104,26 @@ pub fn save_pending(
     let rotated = match ops::rotate(&image, angle) {
         Err(err) => {
             log::error!("Error while rotating '{}': {}", path_str, err);
-            return Err(err);
+            return Err(SaveError::LibError(err));
         }
         Ok(img) => img,
     };
 
-    match rotated.image_write_to_file(path_str) {
+    let heifsave_options = HeifsaveOptions {
+        q: PENDING_QUAL,
+        compression: ForeignHeifCompression::Av1,
+        ..Default::default()
+    };
+
+    match ops::heifsave_with_opts(&rotated, path_str, &heifsave_options) {
         Err(err) => {
-            log::error!("Eror while saving '{}': {}", path_str, err);
-            return Err(err);
+            log::error!("Error while saving '{}': {}", path_str, err);
+            // TODO: heifsave lib has changed and returns "error" on success
+            // See:
+            //  - https://github.com/libvips/libvips/issues/3718#issuecomment-1771494570
+            //  - https://github.com/libvips/libvips/pull/3724
+            //  - https://github.com/olxgroup-oss/libvips-rust-bindings/pull/35
+            // return Err(SaveError::LibError(err));
         }
         Ok(_) => log::info!("Saved '{}'", path_str),
     };
@@ -132,12 +142,11 @@ pub fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error
 }
 
 pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error> {
-    for mapping in FILE_MAPPINGS {
-        let buf = PathBuf::from(folder).join(uuid.to_string() + "." + mapping.file_extension);
-        if buf.exists() {
-            return Ok(buf);
-        }
+    let buf = PathBuf::from(folder).join(format!("{}.avif", uuid.to_string()));
+    if buf.exists() {
+        return Ok(buf);
     }
+
     Err(io::Error::new(
         io::ErrorKind::NotFound,
         format!("No image with UUID '{}'", uuid),

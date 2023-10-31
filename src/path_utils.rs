@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::constants::{CACHE_PATH, ORIGINAL_PATH, PENDING_PATH, UNAPPROVED_PATH};
 
