@@ -2,7 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 pub const CONTENT_LENGTH_LIMIT: usize = 12 * 1024 * 1024;
 pub const LISTEN_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 3000);
-pub const PENDING_QUAL: i32 = 80; // Quality setting for encoder for pending (uploaded) images
+pub const PENDING_QUALITY: i32 = 80; // Quality setting for encoder for pending (uploaded) images
 
 // Image paths
 pub const PENDING_PATH: [&str; 2] = ["data", "pending"]; // Uploaded but Review not yet submitted

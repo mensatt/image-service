@@ -26,11 +26,11 @@ use crate::constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
 async fn main() {
     env_logger::init();
 
-    // Initialize libvips App
+    // Initialize libvips app
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
-    libvips.concurrency_set(2);
+    libvips.concurrency_set(4);
 
-    // Create Router with index and upload endpoints
+    // Create router with index and upload endpoints
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/upload", post(upload_handler))

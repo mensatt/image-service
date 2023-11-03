@@ -9,7 +9,7 @@ use libvips::{
 use uuid::Uuid;
 
 use crate::{
-    constants::PENDING_QUAL,
+    constants::PENDING_QUALITY,
     path_utils::{get_cache_path, get_pending_path},
 };
 
@@ -110,7 +110,7 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
     };
 
     let heifsave_options = HeifsaveOptions {
-        q: PENDING_QUAL,
+        q: PENDING_QUALITY,
         compression: ForeignHeifCompression::Av1,
         ..Default::default()
     };
