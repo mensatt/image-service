@@ -2,12 +2,14 @@ mod constants;
 mod image_utils;
 mod path_utils;
 
+use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Path, Query},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    headers::authorization::{Authorization, Bearer},
     http::{header, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
-    Router,
+    Router, TypedHeader,
 };
 
 use image_utils::{
@@ -17,10 +19,19 @@ use image_utils::{
 use libvips::VipsApp;
 use path_utils::{get_original_path, get_pending_path};
 use serde::Deserialize;
-use std::fs::{read, rename};
+use std::{
+    env,
+    fs::{read, rename},
+};
 use uuid::Uuid;
 
 use crate::constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
+
+#[derive(Clone)]
+pub struct ServerState {
+    // This has to be adapted if support for multiple API keys is needed in the future
+    pub api_key_hash: PasswordHashString,
+}
 
 #[tokio::main]
 async fn main() {
@@ -30,13 +41,23 @@ async fn main() {
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
     libvips.concurrency_set(4);
 
+    // Read allowed api key hash from environment variable
+    let hash_value = match env::var("API_KEY_HASH") {
+        Err(err) => panic!("$API_KEY_HASH is not set ({})", err),
+        Ok(val) => val,
+    };
+    let hash = PasswordHashString::new(&hash_value).unwrap();
+
+    let server_state = ServerState { api_key_hash: hash };
+
     // Create router with index and upload endpoints
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/upload", post(upload_handler))
         .layer(DefaultBodyLimit::max(CONTENT_LENGTH_LIMIT))
         .route("/image/:id", get(image_handler))
-        .route("/approve/:id", post(approve_handler));
+        .route("/approve/:id", post(approve_handler))
+        .with_state(server_state);
 
     log::info!("Listening on {}", LISTEN_ADDR);
     axum::Server::bind(&LISTEN_ADDR)
@@ -211,9 +232,25 @@ async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl I
     return Ok((headers, body));
 }
 
-// TODO: Add auth
 // TODO: Add cron pruning
-async fn approve_handler(Path(uuid): Path<Uuid>) -> Result<String, (StatusCode, String)> {
+async fn approve_handler(
+    State(server_state): State<ServerState>,
+    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
+    Path(uuid): Path<Uuid>,
+) -> Result<String, (StatusCode, String)> {
+    // Check if user is authorized by checking if the given Bearer Token matches the stored hash
+    match (Argon2::default()).verify_password(
+        authorization.token().as_bytes(),
+        &server_state.api_key_hash.password_hash(),
+    ) {
+        Err(err) => {
+            // TODO: Might want to distinguish between invalid password (4xx) and internal errors (e.g. cryptographic ones)
+            log::error!("Error during authentication: {}", err);
+            return Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()));
+        }
+        Ok(_) => (),
+    };
+
     // Check ID
     if uuid.is_nil() {
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
