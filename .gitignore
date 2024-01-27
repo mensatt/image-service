@@ -19,3 +19,6 @@
 !/data/originals/.gitkeep
 !/data/pending/.gitkeep
 !/data/unapproved/.gitkeep
+
+# Ingore .env files everywhere
+**/.env
