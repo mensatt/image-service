@@ -5,23 +5,17 @@ mod image_utils;
 mod path_utils;
 
 use argon2::password_hash::PasswordHashString;
-use auth_utils::check_api_key;
 use axum::{
-    extract::{DefaultBodyLimit, Path, State},
-    headers::authorization::{Authorization, Bearer},
-    http::StatusCode,
+    extract::DefaultBodyLimit,
     response::Html,
     routing::{get, post},
-    Router, TypedHeader,
+    Router,
 };
 
 use constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
-use handlers::{image::image_handler, upload::upload_handler};
-use image_utils::determine_img_path;
+use handlers::{approve::approve_handler, image::image_handler, upload::upload_handler};
 use libvips::VipsApp;
-use path_utils::{get_original_path, get_pending_path};
-use std::{env, fs::rename};
-use uuid::Uuid;
+use std::env;
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -71,41 +65,4 @@ async fn root_handler() -> Html<&'static str> {
         <p>Request pictures at <a href=\"/approve\">/approve/:id</a>.</p>
         ",
     )
-}
-
-// TODO: Add cron pruning
-async fn approve_handler(
-    State(server_state): State<ServerState>,
-    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
-    Path(uuid): Path<Uuid>,
-) -> Result<String, (StatusCode, String)> {
-    check_api_key(authorization, &server_state.api_key_hash)?;
-
-    // Check ID
-    if uuid.is_nil() {
-        return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
-    }
-
-    let source_path = match determine_img_path(get_pending_path().to_str().unwrap(), uuid) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-        }
-        Ok(str) => str,
-    };
-
-    let target_path = get_original_path().join(source_path.file_name().unwrap().to_str().unwrap());
-
-    match rename(&source_path, &target_path) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while approving image!".to_owned(),
-            ));
-        }
-        Ok(_) => log::info!("Moved '{:?}' to '{:?}'", source_path, target_path),
-    };
-
-    Ok(uuid.to_string())
 }
