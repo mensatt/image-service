@@ -1,4 +1,11 @@
-use std::fs::rename;
+use crate::{
+    util::{
+        auth::check_api_key,
+        image::move_image,
+        path::{get_original_path, get_pending_path},
+    },
+    ServerState,
+};
 
 use axum::{
     extract::{Path, State},
@@ -7,15 +14,6 @@ use axum::{
     TypedHeader,
 };
 use uuid::Uuid;
-
-use crate::{
-    util::{
-        auth::check_api_key,
-        image::determine_img_path,
-        path::{get_original_path, get_pending_path},
-    },
-    ServerState,
-};
 
 // TODO: Add cron pruning
 pub async fn approve_handler(
@@ -30,26 +28,22 @@ pub async fn approve_handler(
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let source_path = match determine_img_path(get_pending_path().to_str().unwrap(), uuid) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-        }
-        Ok(str) => str,
+    match move_image(
+        get_pending_path().as_path(),
+        get_original_path().as_path(),
+        uuid,
+    ) {
+        Err(err) => match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()))
+            }
+            _ => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error while approving image!".to_owned(),
+                ))
+            }
+        },
+        Ok(_) => return Ok(uuid.to_string()),
     };
-
-    let target_path = get_original_path().join(source_path.file_name().unwrap().to_str().unwrap());
-
-    match rename(&source_path, &target_path) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while approving image!".to_owned(),
-            ));
-        }
-        Ok(_) => log::info!("Moved '{:?}' to '{:?}'", source_path, target_path),
-    };
-
-    Ok(uuid.to_string())
 }
