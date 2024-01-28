@@ -2,6 +2,11 @@ mod constants;
 mod handlers;
 mod util;
 
+use crate::{
+    constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR},
+    handlers::{approve::approve_handler, image::image_handler, upload::upload_handler},
+};
+
 use argon2::password_hash::PasswordHashString;
 use axum::{
     extract::DefaultBodyLimit,
@@ -9,9 +14,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-
-use constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
-use handlers::{approve::approve_handler, image::image_handler, upload::upload_handler};
 use libvips::VipsApp;
 use std::env;
 
