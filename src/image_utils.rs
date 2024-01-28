@@ -33,6 +33,12 @@ pub enum SaveError {
     IOError(std::io::Error),
 }
 
+#[derive(PartialEq)]
+pub enum CacheBehavior {
+    Normal,
+    Skip,
+}
+
 impl fmt::Display for SaveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -158,6 +164,7 @@ pub fn manipulate_image(
     height: i32,
     width: i32,
     quality: i32,
+    cache_behavior: CacheBehavior,
 ) -> Result<Vec<u8>, libvips::error::Error> {
     let thumb_opts = ops::ThumbnailOptions {
         height: height,
@@ -187,25 +194,27 @@ pub fn manipulate_image(
         Ok(vec) => vec,
     };
 
-    // Also write image to cache
-    let cache_entry = get_cache_entry(
-        PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
-        height,
-        width,
-        quality,
-    );
+    // Write image to cache if desired
+    if cache_behavior == CacheBehavior::Normal {
+        let cache_entry = get_cache_entry(
+            PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
+            height,
+            width,
+            quality,
+        );
 
-    let opts = ops::WebpsaveOptions {
-        q: quality,
-        ..ops::WebpsaveOptions::default()
-    };
-    match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err(err);
-        }
-        Ok(img) => img,
-    };
+        let opts = ops::WebpsaveOptions {
+            q: quality,
+            ..ops::WebpsaveOptions::default()
+        };
+        match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
+            Err(err) => {
+                log::error!("{}", err);
+                return Err(err);
+            }
+            Ok(img) => img,
+        };
+    }
 
     return Ok(buffer);
 }
