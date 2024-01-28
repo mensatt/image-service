@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     constants::PENDING_QUALITY,
-    path_utils::{get_cache_path, get_pending_path},
+    util::path::{get_cache_path, get_pending_path},
 };
 
 #[derive(Debug, PartialEq)]

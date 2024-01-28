@@ -11,12 +11,14 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    auth_utils::check_api_key,
-    image_utils::{
-        check_cache, determine_img_dim, determine_img_path, get_cache_entry, manipulate_image,
-        CacheBehavior,
+    util::{
+        auth::check_api_key,
+        image::{
+            check_cache, determine_img_dim, determine_img_path, get_cache_entry, manipulate_image,
+            CacheBehavior,
+        },
+        path::{get_original_path, get_unapproved_path},
     },
-    path_utils::{get_original_path, get_unapproved_path},
     ServerState,
 };
 

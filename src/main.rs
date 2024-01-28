@@ -1,8 +1,6 @@
-mod auth_utils;
 mod constants;
 mod handlers;
-mod image_utils;
-mod path_utils;
+mod util;
 
 use argon2::password_hash::PasswordHashString;
 use axum::{
