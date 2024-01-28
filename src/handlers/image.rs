@@ -1,19 +1,23 @@
 use std::fs::read;
 
 use axum::{
-    extract::{Path, Query},
+    extract::{Path, Query, State},
+    headers::{authorization::Bearer, Authorization},
     http::{header, StatusCode},
     response::IntoResponse,
+    TypedHeader,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
+    auth_utils::check_api_key,
     image_utils::{
         check_cache, determine_img_dim, determine_img_path, get_cache_entry, manipulate_image,
         CacheBehavior,
     },
-    path_utils::get_original_path,
+    path_utils::{get_original_path, get_unapproved_path},
+    ServerState,
 };
 
 #[derive(Deserialize)]
@@ -25,19 +29,50 @@ pub struct ImageQuery {
 
 // This handler serves images with the given id from the filesystem
 // It accepts optional query parameters for width, height and quality
+// It also accepts an optional Authorization header and - if it's valid - serves unapproved images
 // Images are resized, and compressed using vips
-pub async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> impl IntoResponse {
+pub async fn image_handler(
+    State(server_state): State<ServerState>,
+    authorization_header_opt: Option<TypedHeader<Authorization<Bearer>>>,
+    Path(id): Path<Uuid>,
+    query: Query<ImageQuery>,
+) -> impl IntoResponse {
     // Check ID
     if id.is_nil() {
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    let path = match determine_img_path(get_original_path().to_str().unwrap(), id) {
-        Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
-        Ok(str) => str,
+    // Return image if it exists in original path
+    match determine_img_path(get_original_path().to_str().unwrap(), id) {
+        Err(_) => (),
+        Ok(path) => {
+            return image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Normal)
+        }
     };
 
-    return image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Normal);
+    let not_found_resp = Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
+    match authorization_header_opt {
+        // Return 404 if no header was present
+        // Note: Image was not found in original path, otherwise we would have returned above
+        None => return not_found_resp,
+        Some(TypedHeader(authorization)) => {
+            match check_api_key(authorization, &server_state.api_key_hash) {
+                Err(_) => return not_found_resp, // Return 404 if API Key was invalid
+                Ok(()) => match determine_img_path(get_unapproved_path().to_str().unwrap(), id) {
+                    Err(_) => return not_found_resp, // Return 404 if image was also not found in unapproved path
+                    Ok(path) => {
+                        // Skip cache for unapproved images to avoid leaking them via cache
+                        return image_handler_helper(
+                            id,
+                            path.to_str().unwrap(),
+                            query.0,
+                            CacheBehavior::Skip,
+                        );
+                    }
+                },
+            }
+        }
+    }
 }
 
 /// Takes a uuid, path,an image query and a skip_cache flag and returns the image manipulated by the arguments of image query  
