@@ -1,8 +1,10 @@
+mod auth_utils;
 mod constants;
 mod image_utils;
 mod path_utils;
 
-use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
+use argon2::password_hash::PasswordHashString;
+use auth_utils::check_api_key;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     headers::authorization::{Authorization, Bearer},
@@ -238,18 +240,7 @@ async fn approve_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
 ) -> Result<String, (StatusCode, String)> {
-    // Check if user is authorized by checking if the given Bearer Token matches the stored hash
-    match (Argon2::default()).verify_password(
-        authorization.token().as_bytes(),
-        &server_state.api_key_hash.password_hash(),
-    ) {
-        Err(err) => {
-            // TODO: Might want to distinguish between invalid password (4xx) and internal errors (e.g. cryptographic ones)
-            log::error!("Error during authentication: {}", err);
-            return Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()));
-        }
-        Ok(_) => (),
-    };
+    check_api_key(authorization, &server_state.api_key_hash)?;
 
     // Check ID
     if uuid.is_nil() {
