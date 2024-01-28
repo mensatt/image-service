@@ -1,8 +1,10 @@
+mod cleaner;
 mod constants;
 mod handlers;
 mod util;
 
 use crate::{
+    cleaner::delete_old_pending_images,
     constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR},
     handlers::{
         approve::approve_handler, image::image_handler, submit::submit_handler,
@@ -18,7 +20,7 @@ use axum::{
     Router,
 };
 use libvips::VipsApp;
-use std::env;
+use std::{env, thread};
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -33,6 +35,11 @@ async fn main() {
     // Initialize libvips app
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
     libvips.concurrency_set(4);
+
+    // Create thread that cleans up old pending files
+    thread::spawn(|| {
+        delete_old_pending_images();
+    });
 
     // Read allowed api key hash from environment variable
     let hash_value = match env::var("API_KEY_HASH") {
