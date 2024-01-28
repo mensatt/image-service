@@ -27,7 +27,7 @@ The paths mentioned here are constant and defined in [`src/constants.rs`](https:
 | `/upload`      | Upload an image. <br> Step 1 of [Image Flow](#image-flow).         | no                      | yes                  |
 | `/submit/:id`  | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | no                      | no                   |
 | `/approve/:id` | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow). | yes                     | yes                  |
-| `/image/:id`   | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     | yes¹                 |
+| `/image/:id`   | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     | yes                  |
 
 Authorization is done by providing this header in a request:
 
@@ -35,8 +35,7 @@ Authorization is done by providing this header in a request:
 Authorization: Bearer api_key_goes_here
 ```
 
-¹: Currently only approved images can be retrieved from the `/image/:id` endpoint.  
-In the future an authorized user (aka admin) should also be able to get unapproved images.
+¹: Authorization is required if you want to view unapproved images
 
 ## Production usage
 
