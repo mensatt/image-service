@@ -1,5 +1,9 @@
 use core::fmt;
-use std::{io, path::PathBuf};
+use std::{
+    fs::rename,
+    io,
+    path::{Path, PathBuf},
+};
 
 use axum::body::Bytes;
 use libvips::{
@@ -226,4 +230,27 @@ pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> Pat
 pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
     let cache_entry = get_cache_entry(&uuid.to_string(), height, width, quality);
     return cache_entry.exists();
+}
+
+pub fn move_image(from: &Path, to: &Path, uuid: Uuid) -> Result<(), io::Error> {
+    // Make sure image with given uuid does exist at source path
+    let source_path = match determine_img_path(from.to_str().unwrap(), uuid) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(str) => str,
+    };
+
+    let target_path = to.join(source_path.file_name().unwrap().to_str().unwrap());
+
+    match rename(&source_path, &target_path) {
+        Err(err) => {
+            log::error!("{}", err);
+            return Err(err);
+        }
+        Ok(_) => log::info!("Moved '{:?}' to '{:?}'", source_path, target_path),
+    };
+
+    return Ok(());
 }
