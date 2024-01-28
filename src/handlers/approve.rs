@@ -2,7 +2,7 @@ use crate::{
     util::{
         auth::check_api_key,
         image::move_image,
-        path::{get_original_path, get_pending_path},
+        path::{get_original_path, get_unapproved_path},
     },
     ServerState,
 };
@@ -29,7 +29,7 @@ pub async fn approve_handler(
     }
 
     match move_image(
-        get_pending_path().as_path(),
+        get_unapproved_path().as_path(),
         get_original_path().as_path(),
         uuid,
     ) {

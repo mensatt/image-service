@@ -4,7 +4,10 @@ mod util;
 
 use crate::{
     constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR},
-    handlers::{approve::approve_handler, image::image_handler, upload::upload_handler},
+    handlers::{
+        approve::approve_handler, image::image_handler, submit::submit_handler,
+        upload::upload_handler,
+    },
 };
 
 use argon2::password_hash::PasswordHashString;
@@ -45,8 +48,9 @@ async fn main() {
         .route("/", get(root_handler))
         .route("/upload", post(upload_handler))
         .layer(DefaultBodyLimit::max(CONTENT_LENGTH_LIMIT))
-        .route("/image/:id", get(image_handler))
+        .route("/submit/:id", post(submit_handler))
         .route("/approve/:id", post(approve_handler))
+        .route("/image/:id", get(image_handler))
         .with_state(server_state);
 
     log::info!("Listening on {}", LISTEN_ADDR);
