@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     image_utils::{
         check_cache, determine_img_dim, determine_img_path, get_cache_entry, manipulate_image,
+        CacheBehavior,
     },
     path_utils::get_original_path,
 };
@@ -36,15 +37,16 @@ pub async fn image_handler(Path(id): Path<Uuid>, query: Query<ImageQuery>) -> im
         Ok(str) => str,
     };
 
-    return image_handler_helper(id, path.to_str().unwrap(), query.0);
+    return image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Normal);
 }
 
-/// Takes a uuid, path and an image query and returns the image manipulated by the arguments of image query  
+/// Takes a uuid, path,an image query and a skip_cache flag and returns the image manipulated by the arguments of image query  
 /// If a error occurs, an appropriate HTTP status code and message is returned.
 fn image_handler_helper(
     uuid: Uuid,
     path: &str,
     image_query: ImageQuery,
+    cache_behavior: CacheBehavior,
 ) -> Result<([(header::HeaderName, String); 2], Vec<u8>), (StatusCode, String)> {
     // Get image dimensions; used as fallback in case height and/or width missing in image_query
     let img_dim = match determine_img_dim(path) {
@@ -85,7 +87,7 @@ fn image_handler_helper(
     // If requested image is found in cache, the cached version is returned
     let body = match check_cache(uuid, height, width, quality) {
         true => read(get_cache_entry(&uuid.to_string(), height, width, quality)).unwrap(),
-        false => match manipulate_image(path, height, width, quality) {
+        false => match manipulate_image(path, height, width, quality, cache_behavior) {
             Err(err) => {
                 log::error!("{}", err);
                 return Err((
