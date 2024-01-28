@@ -14,6 +14,7 @@ use axum::{
     Router, TypedHeader,
 };
 
+use constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
 use image_utils::{
     check_cache, determine_file_type, determine_img_dim, determine_img_path, get_cache_entry,
     manipulate_image, save_pending,
@@ -26,8 +27,6 @@ use std::{
     fs::{read, rename},
 };
 use uuid::Uuid;
-
-use crate::constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR};
 
 #[derive(Clone)]
 pub struct ServerState {
