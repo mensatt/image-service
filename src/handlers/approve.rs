@@ -9,9 +9,11 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    auth_utils::check_api_key,
-    image_utils::determine_img_path,
-    path_utils::{get_original_path, get_pending_path},
+    util::{
+        auth::check_api_key,
+        image::determine_img_path,
+        path::{get_original_path, get_pending_path},
+    },
     ServerState,
 };
 

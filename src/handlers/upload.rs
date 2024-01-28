@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     constants::CONTENT_LENGTH_LIMIT,
-    image_utils::{determine_file_type, save_pending},
+    util::image::{determine_file_type, save_pending},
 };
 
 #[derive(Deserialize)]
