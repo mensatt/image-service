@@ -73,7 +73,7 @@ async fn root_handler() -> Html<&'static str> {
         "<h1>This is the image service of Mensatt.</h1>
         <p>The following methods and endpoints are offered:</p>
         <ul>
-            <li><code>POST</code> to <code>/uploads</code></li>
+            <li><code>POST</code> to <code>/upload</code></li>
             <li><code>POST</code> to <code>/submit/:id</code></li>
             <li><code>POST</code> to <code>/approve/:id</code></li>
             <li><code>GET</code> to <code>/image/:id</code></li>
