@@ -122,6 +122,7 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
     let heifsave_options = HeifsaveOptions {
         q: PENDING_QUALITY,
         compression: ForeignHeifCompression::Av1,
+        effort: 0,
         ..Default::default()
     };
 
