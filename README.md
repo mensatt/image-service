@@ -25,7 +25,7 @@ The paths mentioned here are constant and defined in [`src/constants.rs`](https:
 | Name           | Description                                                        | Authorization required? | Already implemented? |
 | -------------- | ------------------------------------------------------------------ | ----------------------- | -------------------- |
 | `/upload`      | Upload an image. <br> Step 1 of [Image Flow](#image-flow).         | no                      | yes                  |
-| `/submit/:id`  | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | no                      | yes                  |
+| `/submit/:id`  | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | yes                     | yes                  |
 | `/approve/:id` | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow). | yes                     | yes                  |
 | `/image/:id`   | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     | yes                  |
 

@@ -1,12 +1,27 @@
-use crate::util::{
-    image::move_image,
-    path::{get_pending_path, get_unapproved_path},
+use crate::{
+    util::{
+        auth::check_api_key,
+        image::move_image,
+        path::{get_pending_path, get_unapproved_path},
+    },
+    ServerState,
 };
 
-use axum::{extract::Path, http::StatusCode, response::IntoResponse};
+use axum::{
+    extract::{Path, State},
+    headers::{authorization::Bearer, Authorization},
+    http::StatusCode,
+    response::IntoResponse,
+    TypedHeader,
+};
 use uuid::Uuid;
 
-pub async fn submit_handler(Path(uuid): Path<Uuid>) -> impl IntoResponse {
+pub async fn submit_handler(
+    State(server_state): State<ServerState>,
+    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
+    Path(uuid): Path<Uuid>,
+) -> impl IntoResponse {
+    check_api_key(authorization, &server_state.api_key_hash)?;
     // Check ID
     if uuid.is_nil() {
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
