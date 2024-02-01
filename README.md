@@ -6,8 +6,6 @@ This is Mensatt's image service. It handles uploads of images and serves them.
 
 This section defines the steps an image that is uploaded to this service undergoes from upload to serving.
 
-Note: Currently, step 2 is skipped and there is no pruning of uploaded images in step 1, since this service is still under development. Changing both of these things is on the roadmap.
-
 1. **Upload**: Typically images are uploaded to this service _during_ creation of reviews in the frontend. Once uploaded, images are rotated, stripped of their EXIF metadata and saved as AVIF in `PENDING_PATH`.
 
    Note: Uploading images before a review is submitted is done to speed up the review submission, as the image is likely to be uploaded by the time the user enters their username and/or review text.  
