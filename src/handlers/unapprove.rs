@@ -16,7 +16,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-pub fn unapprove_handler(
+pub async fn unapprove_handler(
     State(server_state): State<ServerState>,
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
