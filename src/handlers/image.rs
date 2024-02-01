@@ -3,7 +3,7 @@ use crate::{
         auth::check_api_key,
         image::{
             check_cache, delete_image, determine_img_dim, determine_img_path, get_cache_entry,
-            manipulate_image, CacheBehavior,
+            manipulate_image, remove_cache_entries, CacheBehavior,
         },
         path::{get_original_path, get_pending_path, get_unapproved_path},
     },
@@ -163,7 +163,7 @@ pub async fn image_delete_handler(
         .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
     delete_image(&get_original_path(), uuid)
         .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
-    // TODO: Delete all images with `uuid` in cache
+    remove_cache_entries(uuid);
 
     return Ok(uuid.to_string());
 }
