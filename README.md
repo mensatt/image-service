@@ -22,12 +22,13 @@ The paths mentioned here are constant and defined in [`src/constants.rs`](https:
 
 ## API Endpoints
 
-| Name           | Description                                                        | Authorization required? | Already implemented? |
-| -------------- | ------------------------------------------------------------------ | ----------------------- | -------------------- |
-| `/upload`      | Upload an image. <br> Step 1 of [Image Flow](#image-flow).         | no                      | yes                  |
-| `/submit/:id`  | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | yes                     | yes                  |
-| `/approve/:id` | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow). | yes                     | yes                  |
-| `/image/:id`   | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     | yes                  |
+| Name           | Method | Description                                                        | Authorization required? | Already implemented? |
+| -------------- | ------ | ------------------------------------------------------------------ | ----------------------- | -------------------- |
+| `/upload`      | POST   | Upload an image. <br> Step 1 of [Image Flow](#image-flow).         | no                      | yes                  |
+| `/submit/:id`  | POST   | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | yes                     | yes                  |
+| `/approve/:id` | POST   | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow). | yes                     | yes                  |
+| `/image/:id`   | GET    | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     | yes                  |
+| `/image/:id`   | DELETE | Delete image with `id`. <br> Step 4 of [Image Flow](#image-flow).  | no¹                     | yes²                 |
 
 Authorization is done by providing this header in a request:
 
@@ -36,6 +37,7 @@ Authorization: Bearer api_key_goes_here
 ```
 
 ¹: Authorization is required if you want to view unapproved images
+²: Images are not currently purged from the cache
 
 ## Production usage
 

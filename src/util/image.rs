@@ -255,3 +255,33 @@ pub fn move_image(from: &Path, to: &Path, uuid: Uuid) -> Result<(), io::Error> {
 
     return Ok(());
 }
+
+/// Deletes an image with the specified `uuid` from `from`  
+/// Returns an io::Error if an error (apart from file not found - which is the expected state)
+/// was encountered.
+pub fn delete_image(from: &Path, uuid: Uuid) -> Result<(), io::Error> {
+    match determine_img_path(from.to_str().unwrap(), uuid) {
+        Err(err) => match err.kind() {
+            // If the file is not found, everything is as expected
+            io::ErrorKind::NotFound => (),
+            // Some other error occurred, we should return it
+            _ => {
+                log::error!("Error while getting path for '{}': {}", uuid, err);
+                return Err(err);
+            }
+        },
+        Ok(path) => match std::fs::remove_file(&path) {
+            Err(err) => match err.kind() {
+                // If the file is not found, everything is as expected (although this should have returned above)
+                io::ErrorKind::NotFound => (),
+                // Some other error occurred, we should return it
+                _ => {
+                    log::error!("Error while removing '{:?}': {}", path, err);
+                    return Err(err);
+                }
+            },
+            Ok(_) => (), // We're done here
+        },
+    };
+    return Ok(());
+}

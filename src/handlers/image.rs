@@ -1,4 +1,14 @@
-use std::fs::read;
+use crate::{
+    util::{
+        auth::check_api_key,
+        image::{
+            check_cache, delete_image, determine_img_dim, determine_img_path, get_cache_entry,
+            manipulate_image, CacheBehavior,
+        },
+        path::{get_original_path, get_pending_path, get_unapproved_path},
+    },
+    ServerState,
+};
 
 use axum::{
     extract::{Path, Query, State},
@@ -8,19 +18,8 @@ use axum::{
     TypedHeader,
 };
 use serde::Deserialize;
+use std::fs::read;
 use uuid::Uuid;
-
-use crate::{
-    util::{
-        auth::check_api_key,
-        image::{
-            check_cache, determine_img_dim, determine_img_path, get_cache_entry, manipulate_image,
-            CacheBehavior,
-        },
-        path::{get_original_path, get_unapproved_path},
-    },
-    ServerState,
-};
 
 #[derive(Deserialize)]
 pub struct ImageQuery {
@@ -137,4 +136,34 @@ fn image_handler_helper(
     };
 
     return Ok((headers, body));
+}
+
+pub async fn image_delete_handler(
+    State(server_state): State<ServerState>,
+    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
+    Path(uuid): Path<Uuid>,
+) -> Result<String, (StatusCode, String)> {
+    check_api_key(authorization, &server_state.api_key_hash)?;
+
+    // Check ID
+    if uuid.is_nil() {
+        return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
+    }
+
+    // To avoid code duplication below
+    let internal_server_error = (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Error while deleting image!".to_owned(),
+    );
+
+    // Make sure image is deleted from pending, unapproved and original paths
+    delete_image(&get_pending_path(), uuid)
+        .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
+    delete_image(&get_unapproved_path(), uuid)
+        .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
+    delete_image(&get_original_path(), uuid)
+        .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
+    // TODO: Delete all images with `uuid` in cache
+
+    return Ok(uuid.to_string());
 }
