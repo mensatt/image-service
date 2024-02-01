@@ -10,6 +10,7 @@ use crate::{
         approve::approve_handler,
         image::{image_delete_handler, image_handler},
         submit::submit_handler,
+        unapprove::unapprove_handler,
         upload::upload_handler,
     },
 };
@@ -61,6 +62,7 @@ async fn main() {
         .route("/approve/:id", post(approve_handler))
         .route("/image/:id", get(image_handler))
         .route("/image/:id", delete(image_delete_handler))
+        .route("/unapprove/:id", post(unapprove_handler))
         .with_state(server_state);
 
     log::info!("Listening on {}", LISTEN_ADDR);
@@ -81,6 +83,7 @@ async fn root_handler() -> Html<&'static str> {
             <li><code>POST</code> to <code>/approve/:id</code></li>
             <li><code>GET</code> to <code>/image/:id</code></li>
             <li><code>DELETE</code> to <code>/image/:id</code></li>
+            <li><code>POST</code> to <code>/unapprove/:id</code></li>
         </ul>
         <p>For more information, take a look at the <a target=\"_blank\" href=\"https://github.com/mensatt/image-service\">GitHub Repository</a></p>
         ",
