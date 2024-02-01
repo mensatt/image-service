@@ -28,7 +28,7 @@ The paths mentioned here are constant and defined in [`src/constants.rs`](https:
 | `/submit/:id`  | POST   | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).  | yes                     |
 | `/approve/:id` | POST   | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow). | yes                     |
 | `/image/:id`   | GET    | Get image with `id`. <br> Step 4 of [Image Flow](#image-flow).     | no¹                     |
-| `/image/:id`   | DELETE | Delete image with `id`. Also deletes it from cache.                | yes                     |
+| `/image/:id`   | DELETE | Delete image with `id`. <br> Also deletes it from cache.           | yes                     |
 
 Authorization is done by providing this header in a request:
 
