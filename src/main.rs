@@ -24,6 +24,8 @@ use axum::{
 };
 use libvips::VipsApp;
 use std::{env, thread};
+use tower::ServiceBuilder;
+use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -53,6 +55,10 @@ async fn main() {
 
     let server_state = ServerState { api_key_hash: hash };
 
+    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
+
+    let services = ServiceBuilder::new().layer(cors);
+
     // Create router with index and upload endpoints
     let app = Router::new()
         .route("/", get(root_handler))
@@ -63,6 +69,7 @@ async fn main() {
         .route("/image/:id", get(image_handler))
         .route("/image/:id", delete(image_delete_handler))
         .route("/unapprove/:id", post(unapprove_handler))
+        .layer(services)
         .with_state(server_state);
 
     log::info!("Listening on {}", LISTEN_ADDR);
