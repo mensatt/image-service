@@ -91,14 +91,14 @@ pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
 }
 
 pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveError> {
-    let path = get_pending_path().join(format!("{}.avif", uuid.to_string()));
+    let path = get_pending_path().join(format!("{}.avif", uuid));
     let path_str = match path.to_str() {
         Some(str) => str,
         None => {
             return Err(SaveError::IOError(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "error",
-            )))
+            )));
         }
     };
     log::info!("{}", path_str);
@@ -139,21 +139,21 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
         Ok(_) => log::info!("Saved '{}'", path_str),
     };
 
-    return Ok(());
+    Ok(())
 }
 
 pub fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error> {
     match VipsImage::new_from_file(path) {
         Err(err) => {
             log::error!("{}", err);
-            return Err(err);
+            Err(err)
         }
-        Ok(img) => return Ok((img.get_width(), img.get_height())),
-    };
+        Ok(img) => Ok((img.get_width(), img.get_height())),
+    }
 }
 
 pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error> {
-    let buf = PathBuf::from(folder).join(format!("{}.avif", uuid.to_string()));
+    let buf = PathBuf::from(folder).join(format!("{}.avif", uuid));
     if buf.exists() {
         return Ok(buf);
     }
@@ -221,23 +221,23 @@ pub fn manipulate_image(
         };
     }
 
-    return Ok(buffer);
+    Ok(buffer)
 }
 
 pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> PathBuf {
-    return get_cache_path().join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality));
+    get_cache_path().join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality))
 }
 
 pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
     let cache_entry = get_cache_entry(&uuid.to_string(), height, width, quality);
-    return cache_entry.exists();
+    cache_entry.exists()
 }
 
 pub fn remove_cache_entries(uuid: Uuid) {
     match read_dir(get_cache_path()) {
         Err(err) => log::error!("Unable to read pending path: {}", err),
         Ok(iterator) => {
-            iterator.for_each(|dir_entry_res| -> () {
+            iterator.for_each(|dir_entry_res| {
                 match dir_entry_res {
                     Err(err) => log::error!("Error while reading dir entry: {}", err),
                     Ok(dir_entry) => {
@@ -298,7 +298,7 @@ pub fn move_image(from: &Path, to: &Path, uuid: Uuid) -> Result<(), io::Error> {
         Ok(_) => log::info!("Moved '{:?}' to '{:?}'", source_path, target_path),
     };
 
-    return Ok(());
+    Ok(())
 }
 
 /// Deletes an image with the specified `uuid` from `from`  
@@ -315,18 +315,19 @@ pub fn delete_image(from: &Path, uuid: Uuid) -> Result<(), io::Error> {
                 return Err(err);
             }
         },
-        Ok(path) => match std::fs::remove_file(&path) {
-            Err(err) => match err.kind() {
-                // If the file is not found, everything is as expected (although this should have returned above)
-                io::ErrorKind::NotFound => (),
-                // Some other error occurred, we should return it
-                _ => {
-                    log::error!("Error while removing '{:?}': {}", path, err);
-                    return Err(err);
+        Ok(path) => {
+            if let Err(err) = std::fs::remove_file(&path) {
+                match err.kind() {
+                    // If the file is not found, everything is as expected (although this should have returned above)
+                    io::ErrorKind::NotFound => (),
+                    // Some other error occurred, we should return it
+                    _ => {
+                        log::error!("Error while removing '{:?}': {}", path, err);
+                        return Err(err);
+                    }
                 }
-            },
-            Ok(_) => (), // We're done here
-        },
+            }
+        }
     };
-    return Ok(());
+    Ok(())
 }

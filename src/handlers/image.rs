@@ -47,43 +47,51 @@ pub async fn image_handler(
     match determine_img_path(get_original_path().to_str().unwrap(), id) {
         Err(_) => (),
         Ok(path) => {
-            return image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Normal)
+            return image_handler_helper(
+                id,
+                path.to_str().unwrap(),
+                query.0,
+                CacheBehavior::Normal,
+            );
         }
     };
 
     let not_found_resp = Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    match authorization_header_opt {
+    return match authorization_header_opt {
         // Return 404 if no header was present
         // Note: Image was not found in original path, otherwise we would have returned above
-        None => return not_found_resp,
+        None => not_found_resp,
         Some(TypedHeader(authorization)) => {
             match check_api_key(authorization, &server_state.api_key_hash) {
-                Err(_) => return not_found_resp, // Return 404 if API Key was invalid
+                Err(_) => not_found_resp, // Return 404 if API Key was invalid
                 Ok(()) => match determine_img_path(get_unapproved_path().to_str().unwrap(), id) {
-                    Err(_) => return not_found_resp, // Return 404 if image was also not found in unapproved path
+                    Err(_) => not_found_resp, // Return 404 if image was also not found in unapproved path
                     Ok(path) => {
                         // Skip cache for unapproved images to avoid leaking them via cache
-                        return image_handler_helper(
+                        image_handler_helper(
                             id,
                             path.to_str().unwrap(),
                             query.0,
                             CacheBehavior::Skip,
-                        );
+                        )
                     }
                 },
             }
         }
-    }
+    };
 }
 
-/// Takes a uuid, path,an image query and a skip_cache flag and returns the image manipulated by the arguments of image query  
+type Headers = [(header::HeaderName, String); 2];
+type Body = Vec<u8>;
+
+/// Takes a uuid, path,an image query and a skip_cache flag and returns the image manipulated by the arguments of image query
 /// If a error occurs, an appropriate HTTP status code and message is returned.
 fn image_handler_helper(
     uuid: Uuid,
     path: &str,
     image_query: ImageQuery,
     cache_behavior: CacheBehavior,
-) -> Result<([(header::HeaderName, String); 2], Vec<u8>), (StatusCode, String)> {
+) -> Result<(Headers, Body), (StatusCode, String)> {
     // Get image dimensions; used as fallback in case height and/or width missing in image_query
     let img_dim = match determine_img_dim(path) {
         Err(err) => {
@@ -105,10 +113,7 @@ fn image_handler_helper(
         Some(height) => height,
         None => img_dim.1,
     };
-    let quality = match image_query.quality {
-        Some(quality) => quality,
-        None => 100,
-    };
+    let quality = image_query.quality.unwrap_or(100);
 
     // Construct HTTP Header
     let headers = [
@@ -135,7 +140,7 @@ fn image_handler_helper(
         },
     };
 
-    return Ok((headers, body));
+    Ok((headers, body))
 }
 
 pub async fn image_delete_handler(
@@ -165,5 +170,5 @@ pub async fn image_delete_handler(
         .map_err(|_| -> (StatusCode, String) { internal_server_error.clone() })?;
     remove_cache_entries(uuid);
 
-    return Ok(uuid.to_string());
+    Ok(uuid.to_string())
 }
