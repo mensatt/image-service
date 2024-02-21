@@ -9,7 +9,6 @@ edition = "2021"
 argon2 = "0.5.2"
 axum = { version = "0.6.20", features = ["multipart", "headers"] }
 env_logger = "0.10.0"
-http = "1.0.0"
 libvips = "1.5.1"
 log = "0.4.20"
 serde = { version = "1.0.189", features = ["derive"] }
