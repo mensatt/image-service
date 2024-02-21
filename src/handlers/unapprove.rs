@@ -28,26 +28,23 @@ pub async fn unapprove_handler(
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    match move_image(
+    if let Err(err) = move_image(
         get_original_path().as_path(),
         get_unapproved_path().as_path(),
         uuid,
     ) {
-        Err(err) => match err.kind() {
+        return match err.kind() {
             std::io::ErrorKind::NotFound => {
-                return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()))
+                Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()))
             }
-            _ => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error while unapproving image!".to_owned(),
-                ))
-            }
-        },
-        Ok(_) => (),
+            _ => Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while unapproving image!".to_owned(),
+            )),
+        };
     };
 
     remove_cache_entries(uuid);
 
-    return Ok(uuid.to_string());
+    Ok(uuid.to_string())
 }

@@ -28,22 +28,20 @@ pub async fn approve_handler(
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    match move_image(
+    return match move_image(
         get_unapproved_path().as_path(),
         get_original_path().as_path(),
         uuid,
     ) {
         Err(err) => match err.kind() {
             std::io::ErrorKind::NotFound => {
-                return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()))
+                Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()))
             }
-            _ => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error while approving image!".to_owned(),
-                ))
-            }
+            _ => Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while approving image!".to_owned(),
+            )),
         },
-        Ok(_) => return Ok(uuid.to_string()),
+        Ok(_) => Ok(uuid.to_string()),
     };
 }

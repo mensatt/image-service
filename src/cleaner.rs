@@ -19,9 +19,7 @@ pub fn delete_old_pending_images() {
         // Get iterator to iterate over all entries in PENDING_PATH directory
         match read_dir(get_pending_path()) {
             Err(err) => log::error!("Unable to read pending path: {}", err),
-            Ok(iterator) => {
-                iterator.for_each(|dir_entry| -> () { dir_entry_handler(dir_entry, threshold) })
-            }
+            Ok(iterator) => iterator.for_each(|dir_entry| dir_entry_handler(dir_entry, threshold)),
         }
 
         log::info!("Finished deletion of old pending files. Going back to sleep...");
@@ -38,7 +36,7 @@ fn dir_entry_handler(dir_entry_res: Result<DirEntry, io::Error>, threshold: Syst
     let dir_entry = match dir_entry_res {
         Err(err) => {
             log::error!("Error while reading dir entry: {}", err);
-            return ();
+            return;
         }
         Ok(dir_entry) => dir_entry,
     };
