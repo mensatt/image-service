@@ -74,7 +74,7 @@ pub async fn rotate_handler(
         }
     };
 
-    let rotated = match ops::rotate(&image, query.angle) {
+    let rotated = match ops::rotate(&image, query.angle as f64) {
         Ok(rotated) => rotated,
         Err(err) => {
             log::error!(
