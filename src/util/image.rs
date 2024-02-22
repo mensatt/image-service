@@ -46,6 +46,7 @@ pub enum CacheBehavior {
     Skip,
 }
 
+#[allow(dead_code)]
 #[derive(PartialEq)]
 pub enum ImageSearchBehaviour {
     All,
