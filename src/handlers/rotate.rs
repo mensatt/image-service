@@ -1,4 +1,4 @@
-use crate::util::image::{move_image, remove_cache_entries};
+use crate::util::image::remove_cache_entries;
 use crate::{
     util::{
         auth::check_api_key,
@@ -36,29 +36,29 @@ pub async fn rotate_handler(
         ));
     }
 
-    let image_directory = determine_img_dir(query.id, ImageSearchBehaviour::Valid);
-    if image_directory.is_err() {
-        return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    }
+    let image_directory = match determine_img_dir(query.id, ImageSearchBehaviour::Valid) {
+        Ok(image_directory) => image_directory,
+        Err(_) => return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned())),
+    };
 
-    let image_directory = image_directory.unwrap();
-    let image_directory = image_directory.to_str().unwrap();
+    let image_directory_string = image_directory.to_string_lossy().to_string();
 
-    let image_path = determine_img_path(image_directory, query.id);
-    if image_path.is_err() {
-        log::warn!(
+    let image_path = match determine_img_path(image_directory_string.as_str(), query.id) {
+        Err(err) => {
+            log::warn!(
             "Image not found where the path was previously determined. Id: {:?}, Directory: {:?}, Error: {:?}",
             query.id,
-            image_directory,
-            image_path.err()
+            image_directory_string.as_str(),
+            err
         );
-        return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    }
+            return Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
+        }
+        Ok(image_path) => image_path,
+    };
 
-    let image_path = image_path.unwrap();
-    let image_path = image_path.to_str().unwrap();
+    let image_path_string = image_path.to_string_lossy().to_string();
 
-    let image = match VipsImage::new_from_file(image_path) {
+    let image = match VipsImage::new_from_file(image_path_string.as_str()) {
         Ok(image) => image,
         Err(err) => {
             log::error!(
@@ -91,7 +91,7 @@ pub async fn rotate_handler(
 
     let rotated_image_path = format!(
         "{}-rotation{}.avif",
-        image_path.strip_suffix(".avif").unwrap(),
+        image_path_string.strip_suffix(".avif").unwrap(),
         query.angle
     );
 
