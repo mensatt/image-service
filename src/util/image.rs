@@ -27,6 +27,7 @@ pub enum FileType {
     AVIF,
 }
 
+#[allow(dead_code)]
 pub struct FileIdentification {
     file_type: FileType,
     file_extension: &'static str,
