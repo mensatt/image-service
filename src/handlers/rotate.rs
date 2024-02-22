@@ -1,3 +1,4 @@
+use crate::util::image::move_image;
 use crate::{
     util::{
         auth::check_api_key,
@@ -12,6 +13,7 @@ use axum::http::StatusCode;
 use axum::TypedHeader;
 use libvips::{ops, VipsImage};
 use serde::Deserialize;
+use std::fs::rename;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -107,7 +109,13 @@ pub async fn rotate_handler(
         }
     };
 
-    match save_image(&rotated, image_path) {
+    let rotated_image_path = format!(
+        "{}-rotation{}.avif",
+        image_path.strip_suffix(".avif").unwrap(),
+        query.angle
+    );
+
+    match save_image(&rotated, rotated_image_path.as_str()) {
         Ok(_) => (),
         Err(err) => {
             log::error!(
@@ -118,6 +126,21 @@ pub async fn rotate_handler(
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error while saving image!".to_owned(),
+            ));
+        }
+    }
+
+    match rename(rotated_image_path, image_path) {
+        Ok(_) => (),
+        Err(err) => {
+            log::error!(
+                "Error while renaming image. Id: {:?}, Error: {:?}",
+                query.id,
+                err
+            );
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while renaming image!".to_owned(),
             ));
         }
     }
