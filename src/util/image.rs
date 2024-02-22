@@ -17,6 +17,7 @@ use crate::{
     util::path::{get_cache_path, get_original_path, get_pending_path, get_unapproved_path},
 };
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq)]
 pub enum FileType {
     JPEG,
