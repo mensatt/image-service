@@ -1,4 +1,4 @@
-use crate::util::image::move_image;
+use crate::util::image::{move_image, remove_cache_entries};
 use crate::{
     util::{
         auth::check_api_key,
@@ -144,6 +144,8 @@ pub async fn rotate_handler(
             ));
         }
     }
+
+    remove_cache_entries(query.id);
 
     Ok(query.id.to_string())
 }
