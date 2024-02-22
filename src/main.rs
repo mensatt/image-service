@@ -9,6 +9,7 @@ use crate::{
     handlers::{
         approve::approve_handler,
         image::{image_delete_handler, image_handler},
+        rotate::rotate_handler,
         submit::submit_handler,
         unapprove::unapprove_handler,
         upload::upload_handler,
@@ -16,6 +17,7 @@ use crate::{
 };
 
 use argon2::password_hash::PasswordHashString;
+
 use axum::{
     extract::DefaultBodyLimit,
     response::Html,
@@ -23,6 +25,7 @@ use axum::{
     Router,
 };
 use libvips::VipsApp;
+
 use std::{env, thread};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -69,6 +72,7 @@ async fn main() {
         .route("/image/:id", get(image_handler))
         .route("/image/:id", delete(image_delete_handler))
         .route("/unapprove/:id", post(unapprove_handler))
+        .route("/rotate", post(rotate_handler))
         .layer(services)
         .with_state(server_state);
 
