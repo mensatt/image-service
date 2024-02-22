@@ -19,18 +19,7 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 pub struct RotateQuery {
     id: Uuid,
-    angle: f64,
-}
-
-fn compare_floats(a: f64, b: f64) -> bool {
-    (a - b).abs() < f64::EPSILON
-}
-
-fn is_valid_angle(angle: f64) -> bool {
-    compare_floats(angle, 0.0)
-        || compare_floats(angle, 90.0)
-        || compare_floats(angle, 180.0)
-        || compare_floats(angle, 270.0)
+    angle: i64,
 }
 
 pub async fn rotate_handler(
@@ -40,10 +29,10 @@ pub async fn rotate_handler(
 ) -> Result<String, (StatusCode, String)> {
     check_api_key(authorization, &server_state.api_key_hash)?;
 
-    if !is_valid_angle(query.angle) {
+    if query.angle <= 0 || query.angle >= 360 || query.angle % 90 != 0 {
         return Err((
             StatusCode::BAD_REQUEST,
-            "Angle must be one of {0.0, 90.0, 180.0, 270.0}!".to_owned(),
+            "Angle must be one of {90, 180, 270}!".to_owned(),
         ));
     }
 
