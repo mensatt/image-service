@@ -22,6 +22,17 @@ pub struct RotateQuery {
     angle: f64,
 }
 
+fn compare_floats(a: f64, b: f64) -> bool {
+    (a - b).abs() < f64::EPSILON
+}
+
+fn is_valid_angle(angle: f64) -> bool {
+    compare_floats(angle, 0.0)
+        || compare_floats(angle, 90.0)
+        || compare_floats(angle, 180.0)
+        || compare_floats(angle, 270.0)
+}
+
 pub async fn rotate_handler(
     State(server_state): State<ServerState>,
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
@@ -29,10 +40,10 @@ pub async fn rotate_handler(
 ) -> Result<String, (StatusCode, String)> {
     check_api_key(authorization, &server_state.api_key_hash)?;
 
-    if query.angle < 0.0 || query.angle > 360.0 {
+    if !is_valid_angle(query.angle) {
         return Err((
             StatusCode::BAD_REQUEST,
-            "Angle must be 0.0 < angle < 360.0!".to_owned(),
+            "Angle must be one of {0.0, 90.0, 180.0, 270.0}!".to_owned(),
         ));
     }
 
@@ -58,27 +69,7 @@ pub async fn rotate_handler(
     let image_path = image_path.unwrap();
     let image_path = image_path.to_str().unwrap();
 
-    let raw_image = match std::fs::read(image_path) {
-        Ok(raw_image) => raw_image,
-        Err(err) => {
-            log::error!(
-                "Error while reading image. Id: {:?}, Error: {:?}, Path: {:?}",
-                query.id,
-                err,
-                image_path
-            );
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while reading image!".to_owned(),
-            ));
-        }
-    };
-
-    // We need to fully load the image into memory here, as saving a VipsImage to a file it was
-    // memory mapped from is a bad idea. The best solution would be to use `vips_image_new_from_file`
-    // and set memory argument to true (to force loading into memory), but that's not possible
-    // with the rust bindings.
-    let image = match VipsImage::new_from_buffer(raw_image.as_slice(), "") {
+    let image = match VipsImage::new_from_file(image_path) {
         Ok(image) => image,
         Err(err) => {
             log::error!(
