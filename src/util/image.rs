@@ -12,10 +12,9 @@ use libvips::{
 };
 use uuid::Uuid;
 
-use crate::util::path::{get_original_path, get_unapproved_path};
 use crate::{
     constants::PENDING_QUALITY,
-    util::path::{get_cache_path, get_pending_path},
+    util::path::{get_cache_path, get_original_path, get_pending_path, get_unapproved_path},
 };
 
 #[derive(Debug, PartialEq)]
