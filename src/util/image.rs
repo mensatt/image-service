@@ -12,6 +12,7 @@ use libvips::{
 };
 use uuid::Uuid;
 
+use crate::util::path::{get_original_path, get_unapproved_path};
 use crate::{
     constants::PENDING_QUALITY,
     util::path::{get_cache_path, get_pending_path},
@@ -32,6 +33,7 @@ pub struct FileIdentification {
     file_header: &'static [u8],
 }
 
+#[derive(Debug)]
 pub enum SaveError {
     LibError(libvips::error::Error),
     IOError(std::io::Error),
@@ -41,6 +43,13 @@ pub enum SaveError {
 pub enum CacheBehavior {
     Normal,
     Skip,
+}
+
+#[derive(PartialEq)]
+pub enum ImageSearchBehaviour {
+    All,
+    // Valid means, that the image is properly attached to a review, be it unapproved or not
+    Valid,
 }
 
 impl fmt::Display for SaveError {
@@ -119,6 +128,12 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
         Ok(img) => img,
     };
 
+    save_image(&rotated, path_str)?;
+
+    Ok(())
+}
+
+pub fn save_image(image: &VipsImage, path_str: &str) -> Result<(), SaveError> {
     let heifsave_options = HeifsaveOptions {
         q: PENDING_QUALITY,
         compression: ForeignHeifCompression::Av1,
@@ -126,7 +141,7 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
         ..Default::default()
     };
 
-    match ops::heifsave_with_opts(&rotated, path_str, &heifsave_options) {
+    match ops::heifsave_with_opts(image, path_str, &heifsave_options) {
         Err(err) => {
             log::error!("Error while saving '{}': {}", path_str, err);
             // TODO: heifsave lib has changed and returns "error" on success
@@ -137,7 +152,7 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
             // return Err(SaveError::LibError(err));
         }
         Ok(_) => log::info!("Saved '{}'", path_str),
-    };
+    }
 
     Ok(())
 }
@@ -156,6 +171,38 @@ pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error
     let buf = PathBuf::from(folder).join(format!("{}.avif", uuid));
     if buf.exists() {
         return Ok(buf);
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("No image with UUID '{}'", uuid),
+    ))
+}
+
+pub fn determine_img_dir(
+    uuid: Uuid,
+    search_behaviour: ImageSearchBehaviour,
+) -> Result<PathBuf, io::Error> {
+    // Search unapproved
+    if determine_img_path(get_unapproved_path().to_str().unwrap(), uuid).is_ok() {
+        return Ok(get_unapproved_path());
+    }
+
+    // Search original
+    if determine_img_path(get_original_path().to_str().unwrap(), uuid).is_ok() {
+        return Ok(get_original_path());
+    }
+
+    if search_behaviour == ImageSearchBehaviour::Valid {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("No valid image with UUID '{}'", uuid),
+        ));
+    }
+
+    // Search pending
+    if determine_img_path(get_pending_path().to_str().unwrap(), uuid).is_ok() {
+        return Ok(get_pending_path());
     }
 
     Err(io::Error::new(
