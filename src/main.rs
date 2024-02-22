@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(clippy::redundant_field_names)]
 
 mod cleaner;
