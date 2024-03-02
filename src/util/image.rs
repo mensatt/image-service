@@ -215,19 +215,23 @@ pub fn determine_img_dir(
 
 pub fn manipulate_image(
     path: &str,
-    height: i32,
+    height: Option<i32>,
     width: i32,
     quality: i32,
     cache_behavior: CacheBehavior,
 ) -> Result<Vec<u8>, libvips::error::Error> {
-    let thumb_opts = ops::ThumbnailOptions {
-        height: height,
+    let mut thumb_opts = ops::ThumbnailOptions {
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
-        crop: ops::Interesting::Centre,
+        crop: ops::Interesting::All,
+        size: ops::Size::Down,
         ..ops::ThumbnailOptions::default()
     };
+    if let Some(height) = height {
+        thumb_opts.height = height;
+    }
+
     let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
         Err(err) => {
             log::error!("{}", err);
@@ -252,7 +256,7 @@ pub fn manipulate_image(
     if cache_behavior == CacheBehavior::Normal {
         let cache_entry = get_cache_entry(
             PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
-            height,
+            image.get_height(),
             width,
             quality,
         );

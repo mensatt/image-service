@@ -126,9 +126,11 @@ fn image_handler_helper(
 
     // Construct HTTP Body
     // If requested image is found in cache, the cached version is returned
-    let body = match check_cache(uuid, height, width, quality) {
-        true => read(get_cache_entry(&uuid.to_string(), height, width, quality)).unwrap(),
-        false => match manipulate_image(path, height, width, quality, cache_behavior) {
+    let body = match cache_behavior {
+        CacheBehavior::Normal if check_cache(uuid, height, width, quality) => {
+            read(get_cache_entry(&uuid.to_string(), height, width, quality)).unwrap()
+        }
+        _ => match manipulate_image(path, image_query.height, width, quality, cache_behavior) {
             Err(err) => {
                 log::error!("{}", err);
                 return Err((
