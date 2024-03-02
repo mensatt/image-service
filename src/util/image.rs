@@ -225,7 +225,7 @@ pub fn manipulate_image(
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
-        crop: ops::Interesting::Centre,
+        size: ops::Size::Down,
         ..ops::ThumbnailOptions::default()
     };
     let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
