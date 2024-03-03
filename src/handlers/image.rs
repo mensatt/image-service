@@ -113,7 +113,7 @@ fn image_handler_helper(
         Some(height) => height,
         None => img_dim.1,
     };
-    let quality = image_query.quality.unwrap_or(100);
+    let quality = image_query.quality.unwrap_or(80);
 
     // Construct HTTP Header
     let headers = [
