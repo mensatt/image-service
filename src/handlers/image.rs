@@ -105,14 +105,8 @@ fn image_handler_helper(
     };
 
     // Get arguments for manipulate image
-    let width = match image_query.width {
-        Some(width) => width,
-        None => img_dim.0,
-    };
-    let height = match image_query.height {
-        Some(height) => height,
-        None => img_dim.1,
-    };
+    let width = image_query.width.unwrap_or(img_dim.0);
+    let height = image_query.height.unwrap_or(img_dim.1);
     let quality = image_query.quality.unwrap_or(80);
 
     // Construct HTTP Header
