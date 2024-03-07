@@ -1,0 +1,11 @@
+# Same as in .env.dist
+# API_KEY_HASH: "$argon2id$v=19$m=16,t=2,p=1$MFk0OTU4Rm1SbGo5ejFRMw$+A8V9eU2u0GRjJjpg5kRfA"
+
+# Domains which requests should be allowed from via CORS
+CORS_ALLOWED_ORIGINS:
+  - https://example.com
+
+# Methods that should be allowed via CORS
+CORS_ALLOWED_METHODS:
+  - GET
+  - POST

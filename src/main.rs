@@ -16,6 +16,7 @@ use crate::{
         unapprove::unapprove_handler,
         upload::upload_handler,
     },
+    util::cors::{parse_methods, parse_origins},
 };
 
 use argon2::password_hash::PasswordHashString;
@@ -30,7 +31,7 @@ use config::Config;
 use libvips::VipsApp;
 use std::{env, thread};
 use tower::ServiceBuilder;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -71,7 +72,13 @@ async fn main() {
 
     let server_state = ServerState { api_key_hash: hash };
 
-    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
+    // Set up CORS
+    let methods = parse_methods(&config);
+    let origins = parse_origins(&config);
+    log::info!("CORS: Allowing {:?} requests from {:?}.", methods, origins);
+    let cors = CorsLayer::new()
+        .allow_methods(methods)
+        .allow_origin(origins);
 
     let services = ServiceBuilder::new().layer(cors);
 
