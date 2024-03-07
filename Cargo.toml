@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 argon2 = "0.5.2"
 axum = { version = "0.6.20", features = ["multipart", "headers"] }
+config = "0.14.0"
 env_logger = "0.10.0"
 libvips = "1.5.1"
 log = "0.4.20"
