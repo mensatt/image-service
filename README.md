@@ -89,10 +89,22 @@ docker compose build
    RUST_LOG=mensatt_img=debug cargo run
    ```
 
-## Environment Variables
+## Configuration
 
-| Name           | Description                                                                                                                   | Default | Required? |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | --------- |
-| `API_KEY_HASH` | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
+Configuration is done via a YAML-File. The default path is `config.yml` in the current working directory (of the executable).
+If desired, the configuration path can be overwritten via the `CONFIG_PATH` environment variable.
 
-## Contributions
+A sample configuration is provided as [config.dist.yml](config.dist.yml).
+
+### Configuration Options
+
+| Name                   | Description                                                                                                                   | Default | Required? |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | --------- |
+| `API_KEY_HASH`         | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
+| `CORS_ALLOWED_ORIGINS` | List of allowed CORS origins                                                                                                  | -       | yes       |
+| `CORS_ALLOWED_METHODS` | List of allowed CORS methods                                                                                                  | `GET`   | no        |
+
+### Overriding options
+
+Configuration options from the configuration file can be overwritten via environment variables.  
+Note that overriding only works for config options which have a single value (e.g. `API_KEY_HASH`) and not options that are a list (e.g. `CORS_ALLOWED_ORIGINS`)
