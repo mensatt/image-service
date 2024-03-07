@@ -26,8 +26,8 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use config::Config;
 use libvips::VipsApp;
-
 use std::{env, thread};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -51,12 +51,23 @@ async fn main() {
         delete_old_pending_images();
     });
 
-    // Read allowed api key hash from environment variable
-    let hash_value = match env::var("API_KEY_HASH") {
+    // If set, read config from CONFIG_PATH env variable, if not try to read from default path
+    let config_path = env::var("CONFIG_PATH").unwrap_or("config.yml".to_string());
+
+    // Get config from config path
+    // Options set in environment variables override the properties from config file
+    let config = Config::builder()
+        .add_source(config::File::with_name(&config_path))
+        .add_source(config::Environment::default())
+        .build()
+        .expect("Could not build config");
+
+    // Get allowed api key hash from config
+    let hash_value: String = match config.get("API_KEY_HASH") {
         Err(err) => panic!("$API_KEY_HASH is not set ({})", err),
         Ok(val) => val,
     };
-    let hash = PasswordHashString::new(&hash_value).unwrap();
+    let hash = PasswordHashString::new(&hash_value).expect("Failed to parse hash");
 
     let server_state = ServerState { api_key_hash: hash };
 

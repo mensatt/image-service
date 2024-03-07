@@ -22,3 +22,5 @@
 
 # Ingore .env files everywhere
 **/.env
+# Ignore config files with default name everywhere
+**/config.yml
