@@ -6,6 +6,7 @@ services:
     image: mensatt-img:latest
     volumes:
       - ./data/:/data
+      - ./config.yml:/config.yml
     ports:
       - 3000:3000
     environment:
