@@ -1,6 +1,6 @@
 use crate::{
     util::{
-        auth::check_api_key,
+        auth::{check_auth, check_auth_header},
         image::{
             check_cache, delete_image, determine_img_dim, determine_img_path, get_cache_entry,
             manipulate_image, remove_cache_entries, CacheBehavior,
@@ -26,6 +26,7 @@ pub struct ImageQuery {
     width: Option<i32>,
     height: Option<i32>,
     quality: Option<i32>,
+    auth: Option<String>,
 }
 
 // This handler serves images with the given id from the filesystem
@@ -57,27 +58,19 @@ pub async fn image_handler(
     };
 
     let not_found_resp = Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    return match authorization_header_opt {
-        // Return 404 if no header was present
-        // Note: Image was not found in original path, otherwise we would have returned above
-        None => not_found_resp,
-        Some(TypedHeader(authorization)) => {
-            match check_api_key(authorization, &server_state.api_key_hash) {
-                Err(_) => not_found_resp, // Return 404 if API Key was invalid
-                Ok(()) => match determine_img_path(get_unapproved_path().to_str().unwrap(), id) {
-                    Err(_) => not_found_resp, // Return 404 if image was also not found in unapproved path
-                    Ok(path) => {
-                        // Skip cache for unapproved images to avoid leaking them via cache
-                        image_handler_helper(
-                            id,
-                            path.to_str().unwrap(),
-                            query.0,
-                            CacheBehavior::Skip,
-                        )
-                    }
-                },
+    return match check_auth(
+        query.auth.as_ref(),
+        authorization_header_opt,
+        &server_state.api_key_hash,
+    ) {
+        Err(_) => not_found_resp,
+        Ok(()) => match determine_img_path(get_unapproved_path().to_str().unwrap(), id) {
+            Err(_) => not_found_resp, // Return 404 if image was also not found in unapproved path
+            Ok(path) => {
+                // Skip cache for unapproved images to avoid leaking them via cache
+                image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip)
             }
-        }
+        },
     };
 }
 
@@ -144,7 +137,7 @@ pub async fn image_delete_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
 ) -> Result<String, (StatusCode, String)> {
-    check_api_key(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hash)?;
 
     // Check ID
     if uuid.is_nil() {
