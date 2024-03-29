@@ -61,7 +61,7 @@ pub async fn image_handler(
     return match check_auth(
         query.auth.as_ref(),
         authorization_header_opt,
-        &server_state.api_key_hash,
+        &server_state.api_key_hashes,
     ) {
         Err(_) => not_found_resp,
         Ok(()) => match determine_img_path(get_unapproved_path().to_str().unwrap(), id) {
@@ -137,7 +137,7 @@ pub async fn image_delete_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
 ) -> Result<String, (StatusCode, String)> {
-    check_auth_header(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hashes)?;
 
     // Check ID
     if uuid.is_nil() {

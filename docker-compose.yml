@@ -11,6 +11,7 @@ services:
       - 3000:3000
     environment:
       # Values in ${} are automatically sourced from .env in current directory
-      API_KEY_HASH: ${API_KEY_HASH:?} # :? ensures value is set and non-empty
+      # Separated using ';'
+      API_KEY_HASHES: ${API_KEY_HASHES:?} # :? ensures value is set and non-empty
       # To enable more verbose logging
       # RUST_LOG: "mensatt_img=debug"

@@ -21,7 +21,7 @@ pub async fn submit_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
 ) -> impl IntoResponse {
-    check_auth_header(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hashes)?;
     // Check ID
     if uuid.is_nil() {
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));

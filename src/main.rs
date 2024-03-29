@@ -29,14 +29,14 @@ use axum::{
 };
 use config::Config;
 use libvips::VipsApp;
+use std::path::Path;
 use std::{env, thread};
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
 pub struct ServerState {
-    // This has to be adapted if support for multiple API keys is needed in the future
-    pub api_key_hash: PasswordHashString,
+    pub api_key_hashes: Vec<PasswordHashString>,
 }
 
 #[tokio::main]
@@ -57,20 +57,41 @@ async fn main() {
 
     // Get config from config path
     // Options set in environment variables override the properties from config file
-    let config = Config::builder()
-        .add_source(config::File::with_name(&config_path))
-        .add_source(config::Environment::default())
+
+    // Use ';' as separator, as argon hashes contain commas
+    let env_source = config::Environment::default()
+        .list_separator(";")
+        .with_list_parse_key("API_KEY_HASHES")
+        .with_list_parse_key("CORS_ALLOWED_ORIGINS")
+        .with_list_parse_key("CORS_ALLOWED_METHODS")
+        .try_parsing(true);
+
+    let mut config_builder = Config::builder();
+    // Make environment only configuration possible
+    if Path::new(&config_path).exists() {
+        config_builder = config_builder.add_source(config::File::with_name(&config_path));
+    }
+    let config = config_builder
+        .add_source(env_source)
         .build()
         .expect("Could not build config");
 
     // Get allowed api key hash from config
-    let hash_value: String = match config.get("API_KEY_HASH") {
-        Err(err) => panic!("$API_KEY_HASH is not set ({})", err),
+    let hash_values: Vec<String> = match config.get("API_KEY_HASHES") {
+        Err(err) => panic!("$API_KEY_HASHES is not set ({})", err),
         Ok(val) => val,
     };
-    let hash = PasswordHashString::new(&hash_value).expect("Failed to parse hash");
 
-    let server_state = ServerState { api_key_hash: hash };
+    let hashes: Vec<PasswordHashString> = hash_values
+        .iter()
+        .map(|hv| PasswordHashString::new(hv).expect("Failed to parse hash"))
+        .collect();
+
+    log::info!("AUTH: Loaded {:?} password hashes", hashes.len());
+
+    let server_state = ServerState {
+        api_key_hashes: hashes,
+    };
 
     // Set up CORS
     let methods = parse_methods(&config);

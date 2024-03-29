@@ -100,11 +100,11 @@ A sample configuration is provided as [config.dist.yml](config.dist.yml).
 
 | Name                   | Description                                                                                                                   | Default | Required? |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | --------- |
-| `API_KEY_HASH`         | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
+| `API_KEY_HASHES`         | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
 | `CORS_ALLOWED_ORIGINS` | List of allowed CORS origins                                                                                                  | -       | yes       |
 | `CORS_ALLOWED_METHODS` | List of allowed CORS methods                                                                                                  | `GET`   | no        |
 
 ### Overriding options
 
 Configuration options from the configuration file can be overwritten via environment variables.  
-Note that overriding only works for config options which have a single value (e.g. `API_KEY_HASH`) and not options that are a list (e.g. `CORS_ALLOWED_ORIGINS`)
+Note that overriding list values (arrays), works using ';' as the separator. For example, `API_KEY_HASHES='HASH_1;HASH:2'`.
