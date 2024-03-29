@@ -1,7 +1,7 @@
 use crate::util::image::remove_cache_entries;
 use crate::{
     util::{
-        auth::check_api_key,
+        auth::check_auth_header,
         image::{determine_img_dir, determine_img_path, save_image, ImageSearchBehaviour},
     },
     ServerState,
@@ -27,7 +27,7 @@ pub async fn rotate_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     query: Query<RotateQuery>,
 ) -> Result<String, (StatusCode, String)> {
-    check_api_key(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hash)?;
 
     if query.angle <= 0 || query.angle >= 360 || query.angle % 90 != 0 {
         return Err((

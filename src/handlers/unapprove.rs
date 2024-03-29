@@ -1,6 +1,6 @@
 use crate::{
     util::{
-        auth::check_api_key,
+        auth::check_auth_header,
         image::{move_image, remove_cache_entries},
         path::{get_original_path, get_unapproved_path},
     },
@@ -21,7 +21,7 @@ pub async fn unapprove_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     Path(uuid): Path<Uuid>,
 ) -> impl IntoResponse {
-    check_api_key(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hash)?;
 
     // Check ID
     if uuid.is_nil() {
