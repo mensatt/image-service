@@ -27,7 +27,7 @@ pub async fn rotate_handler(
     TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
     query: Query<RotateQuery>,
 ) -> Result<String, (StatusCode, String)> {
-    check_auth_header(authorization, &server_state.api_key_hash)?;
+    check_auth_header(authorization, &server_state.api_key_hashes)?;
 
     if query.angle <= 0 || query.angle >= 360 || query.angle % 90 != 0 {
         return Err((

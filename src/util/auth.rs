@@ -1,4 +1,4 @@
-use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
+use argon2::{password_hash, password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use axum::{
     headers::{authorization::Bearer, Authorization},
     http::StatusCode,
@@ -8,14 +8,14 @@ use axum::{
 pub fn check_auth(
     auth_query: Option<&String>,
     auth_header: Option<TypedHeader<Authorization<Bearer>>>,
-    hash: &PasswordHashString,
+    hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
     if let Some(auth) = auth_query {
-        return check_auth_query(auth, hash);
+        return check_auth_query(auth, hashes);
     }
 
     if let Some(TypedHeader(auth)) = auth_header {
-        return check_auth_header(auth, hash);
+        return check_auth_header(auth, hashes);
     }
 
     Err((StatusCode::UNAUTHORIZED, "Authorization failed!".to_owned()))
@@ -24,28 +24,49 @@ pub fn check_auth(
 /// Checks if user is authorized by checking if the given Bearer Token matches the given hash
 pub fn check_auth_header(
     authorization: Authorization<Bearer>,
-    hash: &PasswordHashString,
+    hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
-    return check_auth_key(authorization.token().as_bytes(), hash);
+    return check_auth_key(authorization.token().as_bytes(), hashes);
 }
 
 /// Checks if user is authorized by checking if a given query parameter matches the given hash
 pub fn check_auth_query(
     authorization: &String,
-    hash: &PasswordHashString,
+    hash: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
     return check_auth_key(authorization.as_bytes(), hash);
 }
 
 /// Checks authorization by checking if a (raw) key matches a given hash  
 /// Returns 401 (UNAUTHORIZED) with appropriate message if they do not match
-pub fn check_auth_key(key: &[u8], hash: &PasswordHashString) -> Result<(), (StatusCode, String)> {
-    return match (Argon2::default()).verify_password(key, &hash.password_hash()) {
-        Err(err) => {
-            // TODO: Might want to distinguish between invalid password (4xx) and internal errors (e.g. cryptographic ones)
-            log::error!("Error during authentication: {}", err);
-            return Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()));
+pub fn check_auth_key(
+    key: &[u8],
+    hashes: &Vec<PasswordHashString>,
+) -> Result<(), (StatusCode, String)> {
+    let mut error: Option<password_hash::errors::Error> = None;
+    let mut err_hash: Option<&PasswordHashString> = None;
+
+    for hash in hashes {
+        match (Argon2::default()).verify_password(key, &hash.password_hash()) {
+            Ok(_) => return Ok(()),
+            Err(err) => {
+                error = Some(err);
+                err_hash = Some(hash);
+            }
         }
-        Ok(_) => Ok(()),
-    };
+    }
+
+    // Logging needs to be done after the loop. Otherwise, the first iteration might fail (because
+    // the key doesn't match), even though it will be successful later on.
+    if let Some(error) = error {
+        if let Some(err_hash) = err_hash {
+            log::error!(
+                "Error during authentication: {} for hash={}",
+                error,
+                err_hash
+            );
+        }
+    }
+
+    Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()))
 }
