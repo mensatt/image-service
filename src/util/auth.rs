@@ -5,6 +5,8 @@ use axum::{
     TypedHeader,
 };
 
+/// Checks if user is authorized by checking if the given Bearer Token or query parameter matches
+/// the given hashes.
 pub fn check_auth(
     auth_query: Option<&String>,
     auth_header: Option<TypedHeader<Authorization<Bearer>>>,
@@ -21,7 +23,7 @@ pub fn check_auth(
     Err((StatusCode::UNAUTHORIZED, "Authorization failed!".to_owned()))
 }
 
-/// Checks if user is authorized by checking if the given Bearer Token matches the given hash
+/// Checks if user is authorized by checking if the given Bearer Token matches the given hashes.
 pub fn check_auth_header(
     authorization: Authorization<Bearer>,
     hashes: &Vec<PasswordHashString>,
@@ -43,30 +45,30 @@ pub fn check_auth_key(
     key: &[u8],
     hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
-    let mut error: Option<password_hash::errors::Error> = None;
-    let mut err_hash: Option<&PasswordHashString> = None;
-
     for hash in hashes {
         match (Argon2::default()).verify_password(key, &hash.password_hash()) {
             Ok(_) => return Ok(()),
             Err(err) => {
-                error = Some(err);
-                err_hash = Some(hash);
+                match err {
+                    password_hash::errors::Error::Password => {
+                        // Password is incorrect
+                        continue;
+                    }
+                    _ => {
+                        // Some other error occurred
+                        log::error!(
+                            "Error during authentication: {} for hash={}",
+                            err,
+                            hash
+                        );
+                        continue;
+                    }
+                }
             }
         }
     }
-
-    // Logging needs to be done after the loop. Otherwise, the first iteration might fail (because
-    // the key doesn't match), even though it will be successful later on.
-    if let Some(error) = error {
-        if let Some(err_hash) = err_hash {
-            log::error!(
-                "Error during authentication: {} for hash={}",
-                error,
-                err_hash
-            );
-        }
-    }
+    
+    log::warn!("Authentication failed for key: {:?}", key);
 
     Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()))
 }
