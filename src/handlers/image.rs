@@ -114,7 +114,7 @@ fn image_handler_helper(
         (header::CONTENT_TYPE, "image/webp".to_owned()),
         (
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename={:?}.webp", uuid),
+            format!("inline; filename={:?}.webp", uuid),
         ),
     ];
 
