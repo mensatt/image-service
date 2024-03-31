@@ -13,7 +13,7 @@ pub fn check_auth(
     hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
     if let Some(auth) = auth_query {
-        return check_auth_query(auth, hashes);
+        return check_auth_key(auth.as_bytes(), hashes);
     }
 
     if let Some(TypedHeader(auth)) = auth_header {
@@ -29,14 +29,6 @@ pub fn check_auth_header(
     hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
     return check_auth_key(authorization.token().as_bytes(), hashes);
-}
-
-/// Checks if user is authorized by checking if a given query parameter matches the given hash
-pub fn check_auth_query(
-    authorization: &String,
-    hash: &Vec<PasswordHashString>,
-) -> Result<(), (StatusCode, String)> {
-    return check_auth_key(authorization.as_bytes(), hash);
 }
 
 /// Checks authorization by checking if a (raw) key matches a given hash  
