@@ -29,7 +29,6 @@ use axum::{
 };
 use config::Config;
 use libvips::VipsApp;
-use std::path::Path;
 use std::{env, thread};
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -66,12 +65,8 @@ async fn main() {
         .with_list_parse_key("CORS_ALLOWED_METHODS")
         .try_parsing(true);
 
-    let mut config_builder = Config::builder();
-    // Make environment only configuration possible
-    if Path::new(&config_path).exists() {
-        config_builder = config_builder.add_source(config::File::with_name(&config_path));
-    }
-    let config = config_builder
+    let config = Config::builder()
+        .add_source(config::File::with_name(&config_path).required(false))
         .add_source(env_source)
         .build()
         .expect("Could not build config");
