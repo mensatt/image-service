@@ -1,10 +1,8 @@
 use crate::{
     util::{
         auth::{check_auth, check_auth_header},
-        image::{
-            check_cache, delete_image, determine_img_dim, determine_img_path, get_cache_entry,
-            manipulate_image, remove_cache_entries, CacheBehavior,
-        },
+        cache::{check_cache, get_cache_entry, remove_cache_entries, CacheBehavior},
+        image::{delete_image, determine_img_dim, determine_img_path, manipulate_image},
         path::{get_original_path, get_pending_path, get_unapproved_path},
     },
     ServerState,

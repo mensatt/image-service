@@ -10,6 +10,9 @@ use crate::{
     constants::{CONTENT_LENGTH_LIMIT, LISTEN_ADDR},
     handlers::{
         approve::approve_handler,
+        cache::{
+            cache_status_handler, delete_cache_entry_handler, precache_handler, purge_cache_handler,
+        },
         image::{image_delete_handler, image_handler},
         rotate::rotate_handler,
         submit::submit_handler,
@@ -109,6 +112,10 @@ async fn main() {
         .route("/image/:id", delete(image_delete_handler))
         .route("/unapprove/:id", post(unapprove_handler))
         .route("/rotate", post(rotate_handler))
+        .route("/cache", get(cache_status_handler))
+        .route("/cache/precache", post(precache_handler))
+        .route("/cache", delete(purge_cache_handler))
+        .route("/cache/:id", delete(delete_cache_entry_handler))
         .layer(services)
         .with_state(server_state);
 

@@ -1,6 +1,6 @@
 use core::fmt;
 use std::{
-    fs::{read_dir, remove_file, rename},
+    fs::rename,
     io,
     path::{Path, PathBuf},
 };
@@ -14,7 +14,8 @@ use uuid::Uuid;
 
 use crate::{
     constants::PENDING_QUALITY,
-    util::path::{get_cache_path, get_original_path, get_pending_path, get_unapproved_path},
+    util::cache::{get_cache_entry, CacheBehavior},
+    util::path::{get_original_path, get_pending_path, get_unapproved_path},
 };
 
 #[allow(clippy::upper_case_acronyms)]
@@ -38,12 +39,6 @@ pub struct FileIdentification {
 pub enum SaveError {
     LibError(libvips::error::Error),
     IOError(std::io::Error),
-}
-
-#[derive(PartialEq)]
-pub enum CacheBehavior {
-    Normal,
-    Skip,
 }
 
 #[allow(dead_code)]
@@ -271,60 +266,6 @@ pub fn manipulate_image(
     }
 
     Ok(buffer)
-}
-
-pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> PathBuf {
-    get_cache_path().join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality))
-}
-
-pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
-    let cache_entry = get_cache_entry(&uuid.to_string(), height, width, quality);
-    cache_entry.exists()
-}
-
-pub fn remove_cache_entries(uuid: Uuid) {
-    match read_dir(get_cache_path()) {
-        Err(err) => log::error!("Unable to read pending path: {}", err),
-        Ok(iterator) => {
-            iterator.for_each(|dir_entry_res| {
-                match dir_entry_res {
-                    Err(err) => log::error!("Error while reading dir entry: {}", err),
-                    Ok(dir_entry) => {
-                        if dir_entry.path().is_file() {
-                            let file_name = dir_entry.file_name();
-                            let file_name_str = match file_name.to_str() {
-                                None => {
-                                    log::error!(
-                                        "Unable to get file name as string for: '{:?}'",
-                                        dir_entry
-                                    );
-                                    return;
-                                }
-                                Some(name) => name,
-                            };
-
-                            // Ignore unwanted files
-                            if !file_name_str.starts_with(&uuid.to_string()) {
-                                return;
-                            }
-
-                            match remove_file(dir_entry.path()) {
-                                Err(err) => match err.kind() {
-                                    io::ErrorKind::NotFound => (), // Can be ignored
-                                    _ => log::error!(
-                                        "Unable to delete '{:?}': {}",
-                                        dir_entry.path(),
-                                        err
-                                    ),
-                                },
-                                Ok(_) => log::info!("Deleted '{:?}'", dir_entry.path()),
-                            }
-                        }
-                    }
-                }
-            })
-        }
-    }
 }
 
 pub fn move_image(from: &Path, to: &Path, uuid: Uuid) -> Result<(), io::Error> {
