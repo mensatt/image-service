@@ -226,6 +226,7 @@ pub fn manipulate_image(
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
         size: ops::Size::Down,
+        crop: ops::Interesting::Attention,
         ..ops::ThumbnailOptions::default()
     };
     let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
