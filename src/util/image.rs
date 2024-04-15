@@ -220,16 +220,23 @@ pub fn manipulate_image(
     quality: i32,
     cache_behavior: CacheBehavior,
 ) -> Result<Vec<u8>, libvips::error::Error> {
-    let thumb_opts = ops::ThumbnailOptions {
+    let thumb_opts = ops::ThumbnailImageOptions {
         height: height,
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
         size: ops::Size::Down,
         crop: ops::Interesting::Attention,
-        ..ops::ThumbnailOptions::default()
+        ..ops::ThumbnailImageOptions::default()
     };
-    let image = match ops::thumbnail_with_opts(path, width, &thumb_opts) {
+
+    let mut orig_image = VipsImage::new_from_file(path)?;
+    if orig_image.get_height() > orig_image.get_width() {
+        // Suspecting non-rotated image, applying quick fix
+        orig_image = ops::rotate(&orig_image, 90f64)?;
+    }
+
+    let image = match ops::thumbnail_image_with_opts(&orig_image, width, &thumb_opts) {
         Err(err) => {
             log::error!("{}", err);
             return Err(err);

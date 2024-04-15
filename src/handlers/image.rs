@@ -86,7 +86,7 @@ fn image_handler_helper(
     cache_behavior: CacheBehavior,
 ) -> Result<(Headers, Body), (StatusCode, String)> {
     // Get image dimensions; used as fallback in case height and/or width missing in image_query
-    let img_dim = match determine_img_dim(path) {
+    let mut img_dim = match determine_img_dim(path) {
         Err(err) => {
             log::error!("{}", err);
             return Err((
@@ -96,6 +96,11 @@ fn image_handler_helper(
         }
         Ok(img_dim) => img_dim,
     };
+
+    if img_dim.1 > img_dim.0 {
+        // Suspected image rotation
+        img_dim = (img_dim.1, img_dim.0)
+    }
 
     // Get arguments for manipulate image
     let width = image_query.width.unwrap_or(img_dim.0);
