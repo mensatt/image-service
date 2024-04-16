@@ -222,7 +222,7 @@ pub fn manipulate_image(
 ) -> Result<Vec<u8>, libvips::error::Error> {
     let mut thumb_opts = ops::ThumbnailImageOptions {
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
-        height: height;
+        height: height,
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
         size: ops::Size::Down,
@@ -238,7 +238,7 @@ pub fn manipulate_image(
     // When a height was specified in the request (then it was not replaced by the original height)
     // TODO: Don't hack around it like this, but instead pass in the proper arguments
     if height == orig_image.get_height() {
-        thumb_opts.crop = ops::Interesting::Attention,
+        thumb_opts.crop = ops::Interesting::Attention;
     }
 
     let image = match ops::thumbnail_image_with_opts(&orig_image, width, &thumb_opts) {
