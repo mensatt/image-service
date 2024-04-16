@@ -220,8 +220,7 @@ pub fn manipulate_image(
     quality: i32,
     cache_behavior: CacheBehavior,
 ) -> Result<Vec<u8>, libvips::error::Error> {
-    let thumb_opts = ops::ThumbnailImageOptions {
-        height: height,
+    let mut thumb_opts = ops::ThumbnailImageOptions {
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
@@ -234,6 +233,12 @@ pub fn manipulate_image(
     if orig_image.get_height() > orig_image.get_width() {
         // Suspecting non-rotated image, applying quick fix
         orig_image = ops::rotate(&orig_image, 90f64)?;
+    }
+
+    // When a height was specified in the request (then it was not replaced by the original height)
+    // TODO: Don't hack around it like this, but instead pass in the proper arguments
+    if height != orig_image.get_height() {
+        thumb_opts.height = height;
     }
 
     let image = match ops::thumbnail_image_with_opts(&orig_image, width, &thumb_opts) {
