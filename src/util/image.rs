@@ -237,7 +237,7 @@ pub fn manipulate_image(
 
     // When a height was specified in the request (then it was not replaced by the original height)
     // TODO: Don't hack around it like this, but instead pass in the proper arguments
-    if height == orig_image.get_height() {
+    if height != orig_image.get_height() {
         thumb_opts.crop = ops::Interesting::Attention;
     }
 
