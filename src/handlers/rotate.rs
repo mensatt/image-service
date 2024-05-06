@@ -1,7 +1,7 @@
-use crate::util::image::remove_cache_entries;
 use crate::{
     util::{
         auth::check_auth_header,
+        cache::remove_cache_entries,
         image::{determine_img_dir, determine_img_path, save_image, ImageSearchBehaviour},
     },
     ServerState,

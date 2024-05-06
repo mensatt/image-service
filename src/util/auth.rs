@@ -48,18 +48,14 @@ pub fn check_auth_key(
                     }
                     _ => {
                         // Some other error occurred
-                        log::error!(
-                            "Error during authentication: {} for hash={}",
-                            err,
-                            hash
-                        );
+                        log::error!("Error during authentication: {} for hash={}", err, hash);
                         continue;
                     }
                 }
             }
         }
     }
-    
+
     log::warn!("Authentication failed for key: {:?}", key);
 
     Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()))
