@@ -230,10 +230,6 @@ pub fn manipulate_image(
     };
 
     let mut orig_image = VipsImage::new_from_file(path)?;
-    if orig_image.get_height() > orig_image.get_width() {
-        // Suspecting non-rotated image, applying quick fix
-        orig_image = ops::rotate(&orig_image, 90f64)?;
-    }
 
     // When a height was specified in the request (then it was not replaced by the original height)
     // TODO: Don't hack around it like this, but instead pass in the proper arguments
