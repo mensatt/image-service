@@ -1,7 +1,7 @@
 use argon2::{password_hash, password_hash::PasswordHashString, Argon2, PasswordVerifier};
-use axum::{
+use axum::http::StatusCode;
+use axum_extra::{
     headers::{authorization::Bearer, Authorization},
-    http::StatusCode,
     TypedHeader,
 };
 
@@ -48,19 +48,18 @@ pub fn check_auth_key(
                     }
                     _ => {
                         // Some other error occurred
-                        log::error!(
-                            "Error during authentication: {} for hash={}",
-                            err,
-                            hash
-                        );
+                        log::error!("Error during authentication: {} for hash={}", err, hash);
                         continue;
                     }
                 }
             }
         }
     }
-    
-    log::warn!("Authentication failed for key: {:?}", key);
+
+    log::warn!(
+        "Authentication failed for key: {:?}",
+        std::str::from_utf8(key).unwrap()
+    );
 
     Err((StatusCode::UNAUTHORIZED, "Invalid token!".to_string()))
 }

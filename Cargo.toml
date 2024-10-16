@@ -6,17 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argon2 = "0.5.2"
-axum = { version = "0.6.20", features = ["multipart", "headers"] }
+argon2 = "0.5.3"
+axum = { version = "0.7.7", features = ["multipart"] }
+axum-extra = { version = "0.9.4", features = ["typed-header"]}
 config = "0.14.0"
-env_logger = "0.10.0"
-libvips = "1.5.1"
-log = "0.4.20"
-serde = { version = "1.0.189", features = ["derive"] }
-tokio = { version = "1.33.0", features = ["full"] }
-tokio-util = { version = "0.7.9", features = ["io"] }
-tower = "0.4.13"
+env_logger = "0.11.5"
+libvips = "1.7.0"
+log = "0.4.22"
+serde = { version = "1.0.210", features = ["derive"] }
+tokio = { version = "1.40.0", features = ["full"] }
+tokio-util = { version = "0.7.12", features = ["io"] }
+tower = "0.5.0"
 # Do *NOT* upgrade, as >= 0.5 is incompatible with axum. Should be fixed in axum 0.7
 # See https://users.rust-lang.org/t/axum-and-tower-http-middleware-issues/102908
-tower-http = { version = "~0.4", features = ["cors"] }
-uuid = { version = "1.4.1", features = ["v4", "serde"] }
+tower-http = { version = "0.6.1", features = ["cors"] }
+uuid = { version = "1.10.0", features = ["v4", "serde"] }

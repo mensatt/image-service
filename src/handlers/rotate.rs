@@ -6,11 +6,14 @@ use crate::{
     },
     ServerState,
 };
-use axum::extract::{Query, State};
-use axum::headers::authorization::Bearer;
-use axum::headers::Authorization;
-use axum::http::StatusCode;
-use axum::TypedHeader;
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
 use libvips::{ops, VipsImage};
 use serde::Deserialize;
 use std::fs::rename;

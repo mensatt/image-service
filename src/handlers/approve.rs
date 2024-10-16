@@ -9,8 +9,10 @@ use crate::{
 
 use axum::{
     extract::{Path, State},
-    headers::{authorization::Bearer, Authorization},
     http::StatusCode,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
 use uuid::Uuid;

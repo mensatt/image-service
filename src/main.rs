@@ -113,8 +113,8 @@ async fn main() {
         .with_state(server_state);
 
     log::info!("Listening on {}", LISTEN_ADDR);
-    axum::Server::bind(&LISTEN_ADDR)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(&LISTEN_ADDR).await.unwrap();
+    axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
 }

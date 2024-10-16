@@ -12,9 +12,11 @@ use crate::{
 
 use axum::{
     extract::{Path, Query, State},
-    headers::{authorization::Bearer, Authorization},
     http::{header, StatusCode},
     response::IntoResponse,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
 use serde::Deserialize;
