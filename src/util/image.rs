@@ -229,7 +229,7 @@ pub fn manipulate_image(
         ..ops::ThumbnailImageOptions::default()
     };
 
-    let mut orig_image = VipsImage::new_from_file(path)?;
+    let orig_image = VipsImage::new_from_file(path)?;
 
     // When a height was specified in the request (then it was not replaced by the original height)
     // TODO: Don't hack around it like this, but instead pass in the proper arguments
