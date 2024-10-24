@@ -45,6 +45,7 @@ async fn main() {
     // Initialize libvips app
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
     libvips.concurrency_set(4);
+    libvips.cache_set_max(0);
 
     // Create thread that cleans up old pending files
     thread::spawn(|| {
