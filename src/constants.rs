@@ -13,3 +13,4 @@ pub const PENDING_PATH: [&str; 2] = ["data", "pending"]; // Uploaded but Review 
 pub const UNAPPROVED_PATH: [&str; 2] = ["data", "unapproved"]; // Submitted, but not yet approved
 pub const ORIGINAL_PATH: [&str; 2] = ["data", "originals"]; // Approved "original" images (rotated and converted to AVIF)
 pub const CACHE_PATH: [&str; 2] = ["data", "cache"]; // Cache for requests
+pub const RAW_PATH: [&str; 2] = ["data", "raw"]; // Raw images as uploaded

@@ -5,6 +5,7 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::util::image::save_raw;
 use crate::{
     constants::CONTENT_LENGTH_LIMIT,
     util::image::{determine_file_type, save_pending},
@@ -65,15 +66,21 @@ pub async fn upload_handler(
     let uuid = Uuid::new_v4();
     let angle = query.angle.unwrap_or(0.0);
 
-    match determine_file_type(&data) {
-        None => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "File type could not be determined or your file type is not supported!".to_owned(),
-            ));
-        }
-        Some(_) => (),
-    };
+    if determine_file_type(&data).is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "File type could not be determined or your file type is not supported!".to_owned(),
+        ));
+    }
+
+    // Save raw image without any modifications
+    if let Err(err) = save_raw(&data, uuid) {
+        log::error!("{}", err);
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "An internal error has occurred!".to_owned(),
+        ));
+    }
 
     if let Err(err) = save_pending(&data, uuid, angle) {
         log::error!("{}", err);

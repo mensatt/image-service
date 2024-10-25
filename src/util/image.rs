@@ -12,6 +12,7 @@ use libvips::{
 };
 use uuid::Uuid;
 
+use crate::util::path::get_raw_path;
 use crate::{
     constants::PENDING_QUALITY,
     util::path::{get_cache_path, get_original_path, get_pending_path, get_unapproved_path},
@@ -101,6 +102,22 @@ pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
         .find(|&mapping| image.starts_with(mapping.file_header))
 }
 
+pub fn save_raw(data: &Bytes, uuid: Uuid) -> Result<(), SaveError> {
+    let path = get_raw_path().join(format!("{}.raw", uuid));
+    let path_str = match path.to_str() {
+        Some(str) => str,
+        None => {
+            return Err(SaveError::IOError(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Could not determine path string",
+            )));
+        }
+    };
+
+    log::info!("Saving raw image to {}", path_str);
+    std::fs::write(path_str, data.as_ref()).map_err(SaveError::IOError)
+}
+
 pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveError> {
     let path = get_pending_path().join(format!("{}.avif", uuid));
     let path_str = match path.to_str() {
@@ -108,11 +125,11 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
         None => {
             return Err(SaveError::IOError(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "error",
+                "Could not determine path string",
             )));
         }
     };
-    log::info!("{}", path_str);
+    log::info!("Saving pending image to {}", path_str);
 
     let image = match VipsImage::new_from_buffer(data, "") {
         Err(err) => {
