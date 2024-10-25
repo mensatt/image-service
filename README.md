@@ -21,7 +21,7 @@ The paths mentioned here are constant and defined in [`src/constants.rs`](https:
 ## API Endpoints
 
 | Name             | Method | Description                                                         | Authorization required? |
-| ---------------- | ------ | ------------------------------------------------------------------- | ----------------------- |
+|------------------|--------|---------------------------------------------------------------------|-------------------------|
 | `/upload`        | POST   | Upload an image. <br> Step 1 of [Image Flow](#image-flow).          | no                      |
 | `/submit/:id`    | POST   | Submit image with `id`. <br> Step 2 of [Image Flow](#image-flow).   | yes                     |
 | `/approve/:id`   | POST   | Approve image with `id`. <br> Step 3 of [Image Flow](#image-flow).  | yes                     |
@@ -99,8 +99,8 @@ A sample configuration is provided as [config.dist.yml](config.dist.yml).
 ### Configuration Options
 
 | Name                   | Description                                                                                                                   | Default | Required? |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | --------- |
-| `API_KEY_HASHES`         | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------|-----------|
+| `API_KEY_HASHES`       | Argon2id hash of the API key to be used. <br> Can be generated [here](https://argon2.online/). Make sure to use Encoded Form. | -       | yes       |
 | `CORS_ALLOWED_ORIGINS` | List of allowed CORS origins                                                                                                  | -       | yes       |
 | `CORS_ALLOWED_METHODS` | List of allowed CORS methods                                                                                                  | `GET`   | no        |
 
