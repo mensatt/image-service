@@ -130,14 +130,14 @@ pub fn save_pending(data: &Bytes, uuid: Uuid, angle: f64) -> Result<(), SaveErro
         Ok(img) => img,
     };
 
-    save_image(&rotated, path_str)?;
+    save_image(&rotated, path_str, PENDING_QUALITY)?;
 
     Ok(())
 }
 
-pub fn save_image(image: &VipsImage, path_str: &str) -> Result<(), SaveError> {
+pub fn save_image(image: &VipsImage, path_str: &str, quality: i32) -> Result<(), SaveError> {
     let heifsave_options = HeifsaveOptions {
-        q: PENDING_QUALITY,
+        q: quality,
         compression: ForeignHeifCompression::Av1,
         effort: 0,
         ..Default::default()

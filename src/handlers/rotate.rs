@@ -1,3 +1,4 @@
+use crate::constants::ROTATION_QUALITY;
 use crate::util::image::remove_cache_entries;
 use crate::{
     util::{
@@ -98,7 +99,7 @@ pub async fn rotate_handler(
         query.angle
     );
 
-    match save_image(&rotated, rotated_image_path.as_str()) {
+    match save_image(&rotated, rotated_image_path.as_str(), ROTATION_QUALITY) {
         Ok(_) => (),
         Err(err) => {
             log::error!(
