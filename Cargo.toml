@@ -7,17 +7,14 @@ edition = "2021"
 
 [dependencies]
 argon2 = "0.5.3"
-axum = { version = "0.7.7", features = ["multipart"] }
-axum-extra = { version = "0.9.4", features = ["typed-header"]}
-config = "0.14.0"
-env_logger = "0.11.5"
+axum = { version = "0.8.6", features = ["multipart"] }
+axum-extra = { version = "0.10.3", features = ["typed-header"]}
+config = "0.15.18"
+env_logger = "0.11.8"
 libvips = "1.7.0"
-log = "0.4.22"
-serde = { version = "1.0.210", features = ["derive"] }
-tokio = { version = "1.40.0", features = ["full"] }
-tokio-util = { version = "0.7.12", features = ["io"] }
-tower = "0.5.0"
-# Do *NOT* upgrade, as >= 0.5 is incompatible with axum. Should be fixed in axum 0.7
-# See https://users.rust-lang.org/t/axum-and-tower-http-middleware-issues/102908
-tower-http = { version = "0.6.1", features = ["cors"] }
-uuid = { version = "1.10.0", features = ["v4", "serde"] }
+log = "0.4.28"
+serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.47.1", features = ["full"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.6", features = ["cors"] }
+uuid = { version = "1.18.1", features = ["v4", "serde"] }
