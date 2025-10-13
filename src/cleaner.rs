@@ -88,7 +88,7 @@ fn dir_entry_handler(dir_entry_res: Result<DirEntry, io::Error>, threshold: Syst
                     log::info!("Deleted {:?}", dir_entry.path());
 
                     // Also delete the corresponding raw image with the same UUID
-                    delete_corresponding_raw_image(file_name_str);
+                    delete_corresponding_raw_image(&dir_entry.path());
                 }
             }
         }
@@ -96,44 +96,28 @@ fn dir_entry_handler(dir_entry_res: Result<DirEntry, io::Error>, threshold: Syst
 }
 
 /// Deletes the raw image file with the same filename (UUID) from the raw directory
-fn delete_corresponding_raw_image(filename: &str) {
-    // Extract the UUID from the filename (before the file extension)
-    let uuid = match filename.rsplit_once('.') {
-        Some((uuid, _ext)) => uuid,
+fn delete_corresponding_raw_image(pending_path: &std::path::Path) {
+    // Extract the UUID from the filename (file stem without extension)
+    let uuid = match pending_path.file_stem() {
+        Some(stem) => stem,
         None => {
-            log::warn!("Unable to extract UUID from filename: {}", filename);
+            log::warn!("Unable to extract UUID from path: {:?}", pending_path);
             return;
         }
     };
 
-    // Look for any file in the raw directory with this UUID
-    let raw_path = get_raw_path();
-    match read_dir(&raw_path) {
-        Err(err) => log::error!("Unable to read raw path: {}", err),
-        Ok(entries) => {
-            for entry_res in entries {
-                let entry = match entry_res {
-                    Ok(e) => e,
-                    Err(err) => {
-                        log::error!("Error reading raw directory entry: {}", err);
-                        continue;
-                    }
-                };
+    // Construct the raw file path: raw_dir/uuid.raw
+    let raw_file_path = get_raw_path().join(uuid).with_extension("raw");
 
-                let raw_filename = match entry.file_name().to_str() {
-                    Some(name) => name.to_string(),
-                    None => continue,
-                };
-
-                // Check if the filename starts with the same UUID
-                if raw_filename.starts_with(uuid) {
-                    match remove_file(entry.path()) {
-                        Err(err) => log::error!("Unable to delete raw file '{:?}': {}", entry.path(), err),
-                        Ok(_) => log::info!("Deleted corresponding raw image: {:?}", entry.path()),
-                    }
-                    break; // Stop after finding and deleting the matching file
-                }
+    // Try to delete the raw file
+    match remove_file(&raw_file_path) {
+        Ok(_) => log::info!("Deleted corresponding raw image: {:?}", raw_file_path),
+        Err(err) => match err.kind() {
+            io::ErrorKind::NotFound => {
+                // This is fine - the raw file might have been deleted already or never existed
+                log::debug!("Raw file not found (already deleted?): {:?}", raw_file_path);
             }
-        }
+            _ => log::error!("Unable to delete raw file '{:?}': {}", raw_file_path, err),
+        },
     }
 }
