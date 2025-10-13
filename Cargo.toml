@@ -19,5 +19,5 @@ tokio-util = { version = "0.7.12", features = ["io"] }
 tower = "0.5.0"
 # Do *NOT* upgrade, as >= 0.5 is incompatible with axum. Should be fixed in axum 0.7
 # See https://users.rust-lang.org/t/axum-and-tower-http-middleware-issues/102908
-tower-http = { version = "0.6.1", features = ["cors"] }
+tower-http = { version = "0.6.6", features = ["cors"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
