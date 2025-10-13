@@ -28,7 +28,7 @@ pub fn check_auth_header(
     authorization: Authorization<Bearer>,
     hashes: &Vec<PasswordHashString>,
 ) -> Result<(), (StatusCode, String)> {
-    return check_auth_key(authorization.token().as_bytes(), hashes);
+    check_auth_key(authorization.token().as_bytes(), hashes)
 }
 
 /// Checks authorization by checking if a (raw) key matches a given hash  

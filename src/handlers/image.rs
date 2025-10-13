@@ -60,7 +60,7 @@ pub async fn image_handler(
     };
 
     let not_found_resp = Err((StatusCode::NOT_FOUND, "Image not found!".to_owned()));
-    return match check_auth(
+    match check_auth(
         query.auth.as_ref(),
         authorization_header_opt,
         &server_state.api_key_hashes,
@@ -73,7 +73,7 @@ pub async fn image_handler(
                 image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip)
             }
         },
-    };
+    }
 }
 
 type Headers = [(header::HeaderName, String); 2];

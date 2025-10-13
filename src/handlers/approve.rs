@@ -30,7 +30,7 @@ pub async fn approve_handler(
         return Err((StatusCode::BAD_REQUEST, "Invalid ID!".to_owned()));
     }
 
-    return match move_image(
+    match move_image(
         get_unapproved_path().as_path(),
         get_original_path().as_path(),
         uuid,
@@ -45,5 +45,5 @@ pub async fn approve_handler(
             )),
         },
         Ok(_) => Ok(uuid.to_string()),
-    };
+    }
 }
