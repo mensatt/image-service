@@ -9,7 +9,7 @@ This section defines the steps an image that is uploaded to this service undergo
 1. **Upload**: Typically images are uploaded to this service _during_ creation of reviews in the frontend. Once uploaded, images are saved in their original format to `RAW_PATH`, then rotated, stripped of their EXIF metadata and saved as AVIF in `PENDING_PATH`.
 
    Note: Uploading images before a review is submitted is done to speed up the review submission, as the image is likely to be uploaded by the time the user enters their username and/or review text.
-   Also, images that stay in the pending folder for longer than an hour will be deleted on regular basis. Raw images are deleted as well if the corresponding image in the pending folder is deleted.
+   Also, images that stay in the pending folder for longer than an hour will be deleted on a regular basis. Raw images are deleted as well if the corresponding image in the pending folder is deleted.
 
 2. **Submission**: Once a review is submitted, the image is moved from `PENDING_PATH` to `UNAPPROVED_PATH`.
 3. **Approval**: Images need to be approved by an administrator. Once an image is approved it is moved from `UNAPPROVED_PATH` to `ORIGINAL_PATH`. The raw image in `RAW_PATH` is retained.
