@@ -16,10 +16,12 @@
 /data/originals/*
 /data/pending/*
 /data/unapproved/*
+/data/raw/*
 !/data/cache/.gitkeep
 !/data/originals/.gitkeep
 !/data/pending/.gitkeep
 !/data/unapproved/.gitkeep
+!/data/raw/.gitkeep
 
 # Ingore .env files everywhere
 **/.env
