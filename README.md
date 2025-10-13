@@ -6,14 +6,14 @@ This is Mensatt's image service. It handles uploads of images and serves them.
 
 This section defines the steps an image that is uploaded to this service undergoes from upload to serving.
 
-1. **Upload**: Typically images are uploaded to this service _during_ creation of reviews in the frontend. Once uploaded, images are rotated, stripped of their EXIF metadata and saved as AVIF in `PENDING_PATH`.
+1. **Upload**: Typically images are uploaded to this service _during_ creation of reviews in the frontend. Once uploaded, images are saved in their original format to `RAW_PATH`, then rotated, stripped of their EXIF metadata and saved as AVIF in `PENDING_PATH`.
 
-   Note: Uploading images before a review is submitted is done to speed up the review submission, as the image is likely to be uploaded by the time the user enters their username and/or review text.  
-   Also, images that stay in the pending folder for longer than an hour will be deleted regularly.
+   Note: Uploading images before a review is submitted is done to speed up the review submission, as the image is likely to be uploaded by the time the user enters their username and/or review text.
+   Also, images that stay in the pending folder for longer than an hour will be deleted on regular basis. Raw images are deleted as well if the corresponding image in the pending folder is deleted.
 
 2. **Submission**: Once a review is submitted, the image is moved from `PENDING_PATH` to `UNAPPROVED_PATH`.
-3. **Approval**: Images need to be approved by an administrator. Once an image is approved it is moved fom `UNAPPROVED_PATH` to `ORIGINAL_PATH`.
-4. **Serving requests**: The first time an image (with a specific size and quality) is requested, it gets generated from the image in `ORIGINAL_PATH` and cached to `CACHE_PATH`.  
+3. **Approval**: Images need to be approved by an administrator. Once an image is approved it is moved from `UNAPPROVED_PATH` to `ORIGINAL_PATH`. The raw image in `RAW_PATH` is retained.
+4. **Serving requests**: The first time an image (with a specific size and quality) is requested, it gets generated from the image in `ORIGINAL_PATH` and cached to `CACHE_PATH`.
    Every following request (with the same size and quality) gets served from `CACHE_PATH`.
 
 The paths mentioned here are constant and defined in [`src/constants.rs`](https://github.com/mensatt/image-service/blob/main/src/constants.rs).

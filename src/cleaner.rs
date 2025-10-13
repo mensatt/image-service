@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::util::path::get_pending_path;
+use crate::util::path::{get_pending_path, get_raw_path};
 
 pub fn delete_old_pending_images() {
     loop {
@@ -85,7 +85,53 @@ fn dir_entry_handler(dir_entry_res: Result<DirEntry, io::Error>, threshold: Syst
             match remove_file(dir_entry.path()) {
                 Err(err) => log::error!("Unable to delete '{:?}': {}", dir_entry.path(), err),
                 Ok(_) => {
-                    log::info!("Deleted {:?}", dir_entry.path())
+                    log::info!("Deleted {:?}", dir_entry.path());
+
+                    // Also delete the corresponding raw image with the same UUID
+                    delete_corresponding_raw_image(file_name_str);
+                }
+            }
+        }
+    }
+}
+
+/// Deletes the raw image file with the same filename (UUID) from the raw directory
+fn delete_corresponding_raw_image(filename: &str) {
+    // Extract the UUID from the filename (before the file extension)
+    let uuid = match filename.rsplit_once('.') {
+        Some((uuid, _ext)) => uuid,
+        None => {
+            log::warn!("Unable to extract UUID from filename: {}", filename);
+            return;
+        }
+    };
+
+    // Look for any file in the raw directory with this UUID
+    let raw_path = get_raw_path();
+    match read_dir(&raw_path) {
+        Err(err) => log::error!("Unable to read raw path: {}", err),
+        Ok(entries) => {
+            for entry_res in entries {
+                let entry = match entry_res {
+                    Ok(e) => e,
+                    Err(err) => {
+                        log::error!("Error reading raw directory entry: {}", err);
+                        continue;
+                    }
+                };
+
+                let raw_filename = match entry.file_name().to_str() {
+                    Some(name) => name.to_string(),
+                    None => continue,
+                };
+
+                // Check if the filename starts with the same UUID
+                if raw_filename.starts_with(uuid) {
+                    match remove_file(entry.path()) {
+                        Err(err) => log::error!("Unable to delete raw file '{:?}': {}", entry.path(), err),
+                        Ok(_) => log::info!("Deleted corresponding raw image: {:?}", entry.path()),
+                    }
+                    break; // Stop after finding and deleting the matching file
                 }
             }
         }
