@@ -12,7 +12,7 @@ This section defines the steps an image that is uploaded to this service undergo
    Also, images that stay in the pending folder for longer than an hour will be deleted on a regular basis. Raw images are deleted as well if the corresponding image in the pending folder is deleted.
 
 2. **Submission**: Once a review is submitted, the image is moved from `PENDING_PATH` to `UNAPPROVED_PATH`.
-3. **Approval**: Images need to be approved by an administrator. Once an image is approved it is moved from `UNAPPROVED_PATH` to `ORIGINAL_PATH`. The raw image in `RAW_PATH` is retained.
+3. **Approval**: Images need to be approved by an administrator. Once an image is approved it is moved from `UNAPPROVED_PATH` to `ORIGINAL_PATH` and the corresponding raw image in `RAW_PATH` is retained.
 4. **Serving requests**: The first time an image (with a specific size and quality) is requested, it gets generated from the image in `ORIGINAL_PATH` and cached to `CACHE_PATH`.
    Every following request (with the same size and quality) gets served from `CACHE_PATH`.
 
