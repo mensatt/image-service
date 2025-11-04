@@ -1,0 +1,90 @@
+name: Build and Release Docker Image
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: write    # needed to create a Git tag on main
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed so we can tag later
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine version and tags
+        id: vars
+        run: |
+          # Default tags
+          IMAGE=ghcr.io/${{ github.repository }}
+          BRANCH=${GITHUB_REF_NAME}
+
+          if [ "$BRANCH" = "dev" ]; then
+            echo "build_tag=next" >> $GITHUB_OUTPUT
+            echo "version_tag=" >> $GITHUB_OUTPUT
+          else
+            # Extract version from Cargo.toml
+            VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+            echo "build_tag=latest" >> $GITHUB_OUTPUT
+            echo "version_tag=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Make sure version is unique 
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=v${{ steps.vars.outputs.version }}
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Error: Git tag '$VERSION' already exists. Please bump the version in Cargo.toml before releasing."
+            exit 1
+          fi
+
+      - name: Create Git tag for release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=v${{ steps.vars.outputs.version }}
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.build_tag }}
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Tag and push versioned image
+        if: steps.vars.outputs.version_tag != ''
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+          VERSION=${{ steps.vars.outputs.version_tag }}
+          docker pull $IMAGE:${{ github.sha }}
+          docker tag $IMAGE:${{ github.sha }} $IMAGE:$VERSION
+          docker push $IMAGE:$VERSION
+
