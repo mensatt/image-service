@@ -44,7 +44,7 @@ jobs:
             # Extract version from Cargo.toml
             VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
             echo "build_tag=latest" >> $GITHUB_OUTPUT
-            echo "version_tag=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "version_tag=${VERSION}" >> $GITHUB_OUTPUT
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
           fi
 
