@@ -7,6 +7,7 @@ use std::{
 
 use axum::body::Bytes;
 use libvips::{
+    bindings::VIPS_MAX_COORD,
     ops::{self, ForeignHeifCompression, HeifsaveOptions},
     VipsImage,
 };
@@ -232,29 +233,34 @@ pub fn determine_img_dir(
 
 pub fn manipulate_image(
     path: &str,
-    height: i32,
-    width: i32,
+    height: Option<i32>,
+    width: Option<i32>,
     quality: i32,
     cache_behavior: CacheBehavior,
 ) -> Result<Vec<u8>, libvips::error::Error> {
-    let mut thumb_opts = ops::ThumbnailImageOptions {
+    // Use MAX_COORD as "infinity" for unspecified dimension
+    // See: https://github.com/libvips/libvips/issues/709#issuecomment-373638244
+    let target_w = width.unwrap_or(VIPS_MAX_COORD.try_into().unwrap());
+    let target_h = height.unwrap_or(VIPS_MAX_COORD.try_into().unwrap());
+
+    // Only crop when both height and width are set
+    // Otherwise (if only one or none are present) the image is simply scaled down.
+    let crop = match (height, width) {
+        (Some(_), Some(_)) => ops::Interesting::Centre,
+        _ => ops::Interesting::None,
+    };
+
+    let thumb_opts = ops::ThumbnailOptions {
+        height: target_h,
         // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
-        height: height,
         import_profile: "sRGB".into(),
         export_profile: "sRGB".into(),
         size: ops::Size::Down,
-        ..ops::ThumbnailImageOptions::default()
+        crop: crop,
+        ..ops::ThumbnailOptions::default()
     };
 
-    let orig_image = VipsImage::new_from_file(path)?;
-
-    // When a height was specified in the request (then it was not replaced by the original height)
-    // TODO: Don't hack around it like this, but instead pass in the proper arguments
-    if height != orig_image.get_height() {
-        thumb_opts.crop = ops::Interesting::Attention;
-    }
-
-    let image = match ops::thumbnail_image_with_opts(&orig_image, width, &thumb_opts) {
+    let image = match ops::thumbnail_with_opts(path, target_w, &thumb_opts) {
         Err(err) => {
             log::error!("{}", err);
             return Err(err);
@@ -278,8 +284,8 @@ pub fn manipulate_image(
     if cache_behavior == CacheBehavior::Normal {
         let cache_entry = get_cache_entry(
             PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
-            height,
-            width,
+            target_h,
+            target_w,
             quality,
         );
 
