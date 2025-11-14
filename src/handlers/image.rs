@@ -2,8 +2,8 @@ use crate::{
     util::{
         auth::{check_auth, check_auth_header},
         image::{
-            check_cache, delete_image, determine_img_dim, determine_img_path, get_cache_entry,
-            manipulate_image, remove_cache_entries, CacheBehavior,
+            check_cache, delete_image, determine_img_path, get_cache_entry, manipulate_image,
+            remove_cache_entries, CacheBehavior,
         },
         path::{get_original_path, get_pending_path, get_unapproved_path},
     },
@@ -87,21 +87,9 @@ fn image_handler_helper(
     image_query: ImageQuery,
     cache_behavior: CacheBehavior,
 ) -> Result<(Headers, Body), (StatusCode, String)> {
-    // Get image dimensions; used as fallback in case height and/or width missing in image_query
-    let img_dim = match determine_img_dim(path) {
-        Err(err) => {
-            log::error!("{}", err);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while getting image dimensions".to_owned(),
-            ));
-        }
-        Ok(img_dim) => img_dim,
-    };
-
     // Get arguments for manipulate image
-    let width = image_query.width.unwrap_or(img_dim.0);
-    let height = image_query.height.unwrap_or(img_dim.1);
+    let width = image_query.width;
+    let height = image_query.height;
     let quality = image_query.quality.unwrap_or(80);
 
     // Construct HTTP Header
@@ -119,13 +107,7 @@ fn image_handler_helper(
         CacheBehavior::Normal if check_cache(uuid, height, width, quality) => {
             read(get_cache_entry(&uuid.to_string(), height, width, quality)).unwrap()
         }
-        _ => match manipulate_image(
-            path,
-            image_query.height,
-            image_query.width,
-            quality,
-            cache_behavior,
-        ) {
+        _ => match manipulate_image(path, height, width, quality, cache_behavior) {
             Err(err) => {
                 log::error!("{}", err);
                 return Err((

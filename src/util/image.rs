@@ -177,16 +177,6 @@ pub fn save_image(image: &VipsImage, path_str: &str, quality: i32) -> Result<(),
     Ok(())
 }
 
-pub fn determine_img_dim(path: &str) -> Result<(i32, i32), libvips::error::Error> {
-    match VipsImage::new_from_file(path) {
-        Err(err) => {
-            log::error!("{}", err);
-            Err(err)
-        }
-        Ok(img) => Ok((img.get_width(), img.get_height())),
-    }
-}
-
 pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error> {
     let buf = PathBuf::from(folder).join(format!("{}.avif", uuid));
     if buf.exists() {
@@ -284,8 +274,8 @@ pub fn manipulate_image(
     if cache_behavior == CacheBehavior::Normal {
         let cache_entry = get_cache_entry(
             PathBuf::from(path).file_stem().unwrap().to_str().unwrap(),
-            target_h,
-            target_w,
+            height,
+            width,
             quality,
         );
 
@@ -305,13 +295,24 @@ pub fn manipulate_image(
     Ok(buffer)
 }
 
-pub fn get_cache_entry(uuid: &str, height: i32, width: i32, quality: i32) -> PathBuf {
-    get_cache_path().join(format!("{}-{}x{}-{}.webp", uuid, width, height, quality))
+pub fn get_cache_entry(
+    uuid: &str,
+    height: Option<i32>,
+    width: Option<i32>,
+    quality: i32,
+) -> PathBuf {
+    // We use the string "UNSPEC" to indicate that a requested resolution value was left
+    // unspecified in the query
+    let width_str = width.map_or("UNSPEC".to_string(), |w| w.to_string());
+    let height_str = height.map_or("UNSPEC".to_string(), |w| w.to_string());
+    get_cache_path().join(format!(
+        "{}-{}x{}-{}.webp",
+        uuid, width_str, height_str, quality
+    ))
 }
 
-pub fn check_cache(uuid: Uuid, height: i32, width: i32, quality: i32) -> bool {
-    let cache_entry = get_cache_entry(&uuid.to_string(), height, width, quality);
-    cache_entry.exists()
+pub fn check_cache(uuid: Uuid, height: Option<i32>, width: Option<i32>, quality: i32) -> bool {
+    get_cache_entry(&uuid.to_string(), height, width, quality).exists()
 }
 
 pub fn remove_cache_entries(uuid: Uuid) {
