@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 argon2 = "0.5.3"
 axum = { version = "0.8.6", features = ["multipart"] }
-axum-extra = { version = "0.10.3", features = ["typed-header"]}
+axum-extra = { version = "0.12.1", features = ["typed-header"]}
 config = "0.15.18"
 env_logger = "0.11.8"
 libvips = "1.7.0"
