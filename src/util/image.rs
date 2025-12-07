@@ -34,6 +34,9 @@ pub struct FileIdentification {
     file_type: FileType,
     file_extension: &'static str,
     file_header: &'static [u8],
+    file_header_byte_offset: usize, // Offset in bytes where to start matching file_header
+                                    // A value of 4 means we discard the first four bytes and
+                                    // start matching at the 5th byte
 }
 
 #[derive(Debug)]
@@ -70,37 +73,40 @@ const FILE_MAPPINGS: [FileIdentification; 5] = [
         file_type: FileType::JPEG,
         file_extension: "jpg",
         file_header: &[0xff, 0xd8, 0xff],
+        file_header_byte_offset: 0,
     },
     FileIdentification {
         file_type: FileType::PNG,
         file_extension: "png",
         file_header: &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+        file_header_byte_offset: 0,
     },
     FileIdentification {
         file_type: FileType::WEBP,
         file_extension: "webp",
         file_header: &[0x52, 0x49, 0x46, 0x46],
+        file_header_byte_offset: 0,
     },
     FileIdentification {
         file_type: FileType::HEIF,
         file_extension: "heic",
-        file_header: &[
-            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
-        ],
+        file_header: &[0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63],
+        file_header_byte_offset: 4,
     },
     FileIdentification {
         file_type: FileType::AVIF,
         file_extension: "avif",
-        file_header: &[
-            0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66,
-        ],
+        file_header: &[0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66],
+        file_header_byte_offset: 4,
     },
 ];
 
 pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
-    FILE_MAPPINGS
-        .iter()
-        .find(|&mapping| image.starts_with(mapping.file_header))
+    FILE_MAPPINGS.iter().find(|&mapping| {
+        let offset = mapping.file_header_byte_offset;
+        offset + mapping.file_header.len() <= image.len()
+            && image[offset..].starts_with(mapping.file_header)
+    })
 }
 
 pub fn save_raw(data: &Bytes, uuid: Uuid) -> Result<(), SaveError> {
