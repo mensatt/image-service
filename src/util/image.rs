@@ -1,7 +1,9 @@
 use core::fmt;
 use std::{
+    ffi::CStr,
     fs::{read_dir, remove_file, rename},
     io,
+    os::raw::{c_char, c_void},
     path::{Path, PathBuf},
 };
 
@@ -18,26 +20,6 @@ use crate::{
     constants::PENDING_QUALITY,
     util::path::{get_cache_path, get_original_path, get_pending_path, get_unapproved_path},
 };
-
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, PartialEq)]
-pub enum FileType {
-    JPEG,
-    PNG,
-    WEBP,
-    HEIF,
-    AVIF,
-}
-
-#[allow(dead_code)]
-pub struct FileIdentification {
-    file_type: FileType,
-    file_extension: &'static str,
-    file_header: &'static [u8],
-    file_header_byte_offset: usize, // Offset in bytes where to start matching file_header
-                                    // A value of 4 means we discard the first four bytes and
-                                    // start matching at the 5th byte
-}
 
 #[derive(Debug)]
 pub enum SaveError {
@@ -68,45 +50,28 @@ impl fmt::Display for SaveError {
     }
 }
 
-const FILE_MAPPINGS: [FileIdentification; 5] = [
-    FileIdentification {
-        file_type: FileType::JPEG,
-        file_extension: "jpg",
-        file_header: &[0xff, 0xd8, 0xff],
-        file_header_byte_offset: 0,
-    },
-    FileIdentification {
-        file_type: FileType::PNG,
-        file_extension: "png",
-        file_header: &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-        file_header_byte_offset: 0,
-    },
-    FileIdentification {
-        file_type: FileType::WEBP,
-        file_extension: "webp",
-        file_header: &[0x52, 0x49, 0x46, 0x46],
-        file_header_byte_offset: 0,
-    },
-    FileIdentification {
-        file_type: FileType::HEIF,
-        file_extension: "heic",
-        file_header: &[0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63],
-        file_header_byte_offset: 4,
-    },
-    FileIdentification {
-        file_type: FileType::AVIF,
-        file_extension: "avif",
-        file_header: &[0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66],
-        file_header_byte_offset: 4,
-    },
-];
-
-pub fn determine_file_type(image: &Bytes) -> Option<&FileIdentification> {
-    FILE_MAPPINGS.iter().find(|&mapping| {
-        let offset = mapping.file_header_byte_offset;
-        offset + mapping.file_header.len() <= image.len()
-            && image[offset..].starts_with(mapping.file_header)
-    })
+/// Check if the given byte array is something that libvips can load
+/// If so, return the name of the loader as string
+/// If not, return None
+pub fn get_libvips_loader(image: &Bytes) -> Option<&str> {
+    // NOTE: unsafe code can be removed once
+    //   https://github.com/olxgroup-oss/libvips-rust-bindings/issues/131
+    // is resolved
+    // TODO: Check if libvips crate has support for the find_load_buffer function
+    let len: u64 = image.len().try_into().unwrap();
+    let ptr = image.as_ptr() as *const c_void;
+    let char_ptr: *const c_char =
+        unsafe { libvips::bindings::vips_foreign_find_load_buffer(ptr, len) };
+    if char_ptr.is_null() {
+        return None;
+    }
+    let c_str = unsafe { CStr::from_ptr(char_ptr) };
+    c_str
+        .to_str()
+        .map_err(|e| {
+            log::error!("Error when converting CStr to &str: {}", e);
+        })
+        .ok()
 }
 
 pub fn save_raw(data: &Bytes, uuid: Uuid) -> Result<(), SaveError> {

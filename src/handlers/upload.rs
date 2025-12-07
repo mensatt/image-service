@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::util::image::save_raw;
 use crate::{
     constants::CONTENT_LENGTH_LIMIT,
-    util::image::{determine_file_type, save_pending},
+    util::image::{get_libvips_loader, save_pending},
 };
 
 #[derive(Deserialize)]
@@ -66,7 +66,7 @@ pub async fn upload_handler(
     let uuid = Uuid::new_v4();
     let angle = query.angle.unwrap_or(0.0);
 
-    if determine_file_type(&data).is_none() {
+    if get_libvips_loader(&data).is_none() {
         return Err((
             StatusCode::BAD_REQUEST,
             "File type could not be determined or your file type is not supported!".to_owned(),
