@@ -1,5 +1,5 @@
 # Builder
-FROM rust:1.92.0-alpine3.23 AS builder
+FROM rust:1.96.0-alpine3.24 AS builder
 
 RUN apk upgrade --no-cache && apk add --no-cache musl-dev vips-dev
 WORKDIR /usr/src/mensatt-img
@@ -11,7 +11,7 @@ RUN RUSTFLAGS="-C target-feature=-crt-static $(pkg-config vips --libs)" cargo bu
         cp target/release/mensatt-img /usr/src/mensatt-img/mensatt-img
 
 # Runner
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk upgrade --no-cache && apk --no-cache add libheif vips 
 COPY --from=builder /usr/src/mensatt-img/mensatt-img /usr/local/bin/mensatt-img
 EXPOSE 3000

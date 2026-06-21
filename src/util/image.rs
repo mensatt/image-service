@@ -7,7 +7,7 @@ use std::{
 
 use axum::body::Bytes;
 use libvips::{
-    bindings::VIPS_MAX_COORD,
+    bindings::VIPS_DEFAULT_MAX_COORD,
     ops::{self, ForeignHeifCompression, HeifsaveOptions},
     VipsImage,
 };
@@ -236,8 +236,8 @@ pub fn manipulate_image(
 ) -> Result<Vec<u8>, libvips::error::Error> {
     // Use MAX_COORD as "infinity" for unspecified dimension
     // See: https://github.com/libvips/libvips/issues/709#issuecomment-373638244
-    let target_w = width.unwrap_or(VIPS_MAX_COORD.try_into().unwrap());
-    let target_h = height.unwrap_or(VIPS_MAX_COORD.try_into().unwrap());
+    let target_w = width.unwrap_or(VIPS_DEFAULT_MAX_COORD.try_into().unwrap());
+    let target_h = height.unwrap_or(VIPS_DEFAULT_MAX_COORD.try_into().unwrap());
 
     // Only crop when both height and width are set
     // Otherwise (if only one or none are present) the image is simply scaled down.
@@ -248,9 +248,6 @@ pub fn manipulate_image(
 
     let thumb_opts = ops::ThumbnailOptions {
         height: target_h,
-        // See https://github.com/olxgroup-oss/libvips-rust-bindings/issues/42
-        import_profile: "sRGB".into(),
-        export_profile: "sRGB".into(),
         size: ops::Size::Down,
         crop: crop,
         ..ops::ThumbnailOptions::default()
