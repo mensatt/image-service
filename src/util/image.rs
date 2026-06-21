@@ -170,7 +170,7 @@ pub fn save_image(image: &VipsImage, path_str: &str, quality: i32) -> Result<(),
     match ops::heifsave_with_opts(image, path_str, &heifsave_options) {
         Err(err) => {
             log::error!("Error while saving '{}': {}", path_str, err);
-            return Err(SaveError::LibError(err));
+            Err(SaveError::LibError(err))
         }
         Ok(_) => {
             log::info!("Saved '{}'", path_str);
