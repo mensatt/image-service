@@ -170,17 +170,13 @@ pub fn save_image(image: &VipsImage, path_str: &str, quality: i32) -> Result<(),
     match ops::heifsave_with_opts(image, path_str, &heifsave_options) {
         Err(err) => {
             log::error!("Error while saving '{}': {}", path_str, err);
-            // TODO: heifsave lib has changed and returns "error" on success
-            // See:
-            //  - https://github.com/libvips/libvips/issues/3718#issuecomment-1771494570
-            //  - https://github.com/libvips/libvips/pull/3724
-            //  - https://github.com/olxgroup-oss/libvips-rust-bindings/pull/35
-            // return Err(SaveError::LibError(err));
+            return Err(SaveError::LibError(err));
         }
-        Ok(_) => log::info!("Saved '{}'", path_str),
+        Ok(_) => {
+            log::info!("Saved '{}'", path_str);
+            Ok(())
+        }
     }
-
-    Ok(())
 }
 
 pub fn determine_img_path(folder: &str, uuid: Uuid) -> Result<PathBuf, io::Error> {
