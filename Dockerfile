@@ -12,7 +12,7 @@ RUN RUSTFLAGS="-C target-feature=-crt-static $(pkg-config vips --libs)" cargo bu
 
 # Runner
 FROM alpine:3.24
-RUN apk upgrade --no-cache && apk --no-cache add libheif vips 
+RUN apk upgrade --no-cache && apk --no-cache add libheif libavif vips
 COPY --from=builder /usr/src/mensatt-img/mensatt-img /usr/local/bin/mensatt-img
 EXPOSE 3000
 WORKDIR /
