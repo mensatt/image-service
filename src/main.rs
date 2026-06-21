@@ -29,7 +29,7 @@ use axum::{
 };
 use config::Config;
 use libvips::VipsApp;
-use std::{env, thread};
+use std::{env, thread, time::Duration};
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
@@ -46,6 +46,20 @@ async fn main() {
     let libvips = VipsApp::new("mensatt", true).expect("Could not start libvips");
     libvips.concurrency_set(4);
     libvips.cache_set_max(0);
+
+    // Create a thread to poll the libvips error buffer to capture and log errors
+    // NOTE: Moving VipsApp is fine, as nothing in this Rust code uses it again.
+    //       It is only used under the hood by libvips.
+    thread::spawn(move || loop {
+        match libvips.error_buffer() {
+            Ok(error) if !error.is_empty() => {
+                log::error!("Libvips Error Buffer: '{}'", error);
+                libvips.error_clear();
+            }
+            _ => {}
+        }
+        thread::sleep(Duration::from_millis(500));
+    });
 
     // Create thread that cleans up old pending files
     thread::spawn(|| {
