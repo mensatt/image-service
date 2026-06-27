@@ -278,12 +278,9 @@ pub fn manipulate_image(
             quality,
         );
 
-        match std::fs::write(&cache_entry, &buffer) {
-            Err(err) => {
-                log::error!("{}", err);
-                return Err(SaveError::IOError(err));
-            }
-            Ok(img) => img,
+        if let Err(err) = std::fs::write(&cache_entry, &buffer) {
+            log::error!("{}", err);
+            return Err(SaveError::IOError(err));
         };
     }
 
