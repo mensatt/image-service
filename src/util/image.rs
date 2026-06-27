@@ -229,7 +229,7 @@ pub fn manipulate_image(
     width: Option<i32>,
     quality: i32,
     cache_behavior: CacheBehavior,
-) -> Result<Vec<u8>, libvips::error::Error> {
+) -> Result<Vec<u8>, SaveError> {
     // Use MAX_COORD as "infinity" for unspecified dimension
     // See: https://github.com/libvips/libvips/issues/709#issuecomment-373638244
     let target_w = width.unwrap_or(VIPS_DEFAULT_MAX_COORD.try_into().unwrap());
@@ -252,7 +252,7 @@ pub fn manipulate_image(
     let image = match ops::thumbnail_with_opts(path, target_w, &thumb_opts) {
         Err(err) => {
             log::error!("{}", err);
-            return Err(err);
+            return Err(SaveError::LibError(err));
         }
         Ok(img) => img,
     };
@@ -264,7 +264,7 @@ pub fn manipulate_image(
     let buffer: Vec<u8> = match ops::webpsave_buffer_with_opts(&image, &webpsave_buffer_options) {
         Err(err) => {
             log::error!("{}", err);
-            return Err(err);
+            return Err(SaveError::LibError(err));
         }
         Ok(vec) => vec,
     };
@@ -278,14 +278,10 @@ pub fn manipulate_image(
             quality,
         );
 
-        let opts = ops::WebpsaveOptions {
-            q: quality,
-            ..ops::WebpsaveOptions::default()
-        };
-        match ops::webpsave_with_opts(&image, cache_entry.to_str().unwrap(), &opts) {
+        match std::fs::write(&cache_entry, &buffer) {
             Err(err) => {
                 log::error!("{}", err);
-                return Err(err);
+                return Err(SaveError::IOError(err));
             }
             Ok(img) => img,
         };
