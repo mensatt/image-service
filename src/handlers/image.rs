@@ -71,8 +71,7 @@ pub async fn image_handler(
             Err(_) => not_found_resp, // Return 404 if image was also not found in unapproved path
             Ok(path) => {
                 // Skip cache for unapproved images to avoid leaking them via cache
-                image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip)
-                    .await
+                image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip).await
             }
         },
     }
@@ -104,6 +103,7 @@ async fn image_handler_helper(
     ];
 
     // Run read & libvips in a blocking thread pool so they never stall the async workers serving other requests
+    let path = path.to_owned();
     let body = tokio::task::spawn_blocking(move || -> Result<Body, (StatusCode, String)> {
         // If cache is desired and requested image is already cached, return the cached version
         if cache_behavior == CacheBehavior::Normal && check_cache(uuid, height, width, quality) {
