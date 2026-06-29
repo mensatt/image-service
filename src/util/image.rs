@@ -310,6 +310,7 @@ pub fn get_cache_entry(
     ))
 }
 
+/// Returns true if an image under the specified parameters is cached
 pub fn check_cache(uuid: Uuid, height: Option<i32>, width: Option<i32>, quality: i32) -> bool {
     get_cache_entry(&uuid.to_string(), height, width, quality).exists()
 }
