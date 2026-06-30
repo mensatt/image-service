@@ -55,7 +55,8 @@ pub async fn image_handler(
                 path.to_str().unwrap(),
                 query.0,
                 CacheBehavior::Normal,
-            );
+            )
+            .await;
         }
     };
 
@@ -70,7 +71,7 @@ pub async fn image_handler(
             Err(_) => not_found_resp, // Return 404 if image was also not found in unapproved path
             Ok(path) => {
                 // Skip cache for unapproved images to avoid leaking them via cache
-                image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip)
+                image_handler_helper(id, path.to_str().unwrap(), query.0, CacheBehavior::Skip).await
             }
         },
     }
@@ -81,7 +82,7 @@ type Body = Vec<u8>;
 
 /// Takes a uuid, path,an image query and a skip_cache flag and returns the image manipulated by the arguments of image query
 /// If a error occurs, an appropriate HTTP status code and message is returned.
-fn image_handler_helper(
+async fn image_handler_helper(
     uuid: Uuid,
     path: &str,
     image_query: ImageQuery,
@@ -101,23 +102,38 @@ fn image_handler_helper(
         ),
     ];
 
-    // Construct HTTP Body
-    // If cache is desired and requested image is already cached, the cached version is returned
-    let body = match cache_behavior {
-        CacheBehavior::Normal if check_cache(uuid, height, width, quality) => {
-            read(get_cache_entry(&uuid.to_string(), height, width, quality)).unwrap()
+    // Run read & libvips in a blocking thread pool so they never stall the async workers serving other requests
+    let path = path.to_owned();
+    let body = tokio::task::spawn_blocking(move || -> Result<Body, (StatusCode, String)> {
+        // If cache is desired and requested image is already cached, return the cached version
+        if cache_behavior == CacheBehavior::Normal && check_cache(uuid, height, width, quality) {
+            return read(get_cache_entry(&uuid.to_string(), height, width, quality)).map_err(
+                |err| {
+                    log::error!("{}", err);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Error while reading image!".to_owned(),
+                    )
+                },
+            );
         }
-        _ => match manipulate_image(path, height, width, quality, cache_behavior) {
-            Err(err) => {
-                log::error!("{}", err);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error while processing image!".to_owned(),
-                ));
-            }
-            Ok(buf) => buf,
-        },
-    };
+
+        manipulate_image(&path, height, width, quality, cache_behavior).map_err(|err| {
+            log::error!("{}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while processing image!".to_owned(),
+            )
+        })
+    })
+    .await
+    .map_err(|err| {
+        log::error!("blocking image task failed: {}", err);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error while processing image!".to_owned(),
+        )
+    })??;
 
     Ok((headers, body))
 }
