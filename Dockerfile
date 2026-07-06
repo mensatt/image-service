@@ -1,5 +1,5 @@
 # Builder
-FROM rust:1.96.0-alpine3.24 AS builder
+FROM rust:1.96.1-alpine3.24 AS builder
 
 RUN apk upgrade --no-cache && apk add --no-cache musl-dev vips-dev
 WORKDIR /usr/src/mensatt-img
